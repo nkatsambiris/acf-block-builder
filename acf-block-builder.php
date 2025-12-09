@@ -31,7 +31,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'ACF_BLOCK_BUILDER_PATH', plugin_dir_path( __FILE__ ) );
 define( 'ACF_BLOCK_BUILDER_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACF_BLOCK_BUILDER_FILE', __FILE__ );
-define( 'ACF_BLOCK_BUILDER_VERSION', '1.0.0' );
+define( 'ACF_BLOCK_BUILDER_VERSION', '1.0.2' );
 
 class ACF_Block_Builder {
 
