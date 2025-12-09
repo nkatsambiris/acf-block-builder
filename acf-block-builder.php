@@ -1,0 +1,298 @@
+<?php
+/**
+ * Plugin Name: ACF Block Builder
+ * Description: A tool to easily create and manage ACF Blocks using AI and an internal code editor.
+ * Version: 1.0.0
+ * Author: Your Name
+ * Text Domain: acf-block-builder
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+define( 'ACF_BLOCK_BUILDER_PATH', plugin_dir_path( __FILE__ ) );
+define( 'ACF_BLOCK_BUILDER_URL', plugin_dir_url( __FILE__ ) );
+define( 'ACF_BLOCK_BUILDER_VERSION', '1.0.0' );
+
+class ACF_Block_Builder {
+
+	public function __construct() {
+		add_action( 'init', array( $this, 'register_post_type' ) );
+		add_action( 'init', array( $this, 'register_acf_blocks' ) );
+		add_action( 'acf/init', array( $this, 'register_acf_fields' ) );
+		
+		// Create uploads directory if it doesn't exist
+		add_action( 'admin_init', array( $this, 'create_uploads_directory' ) );
+
+		// Plugin updater
+		require_once ACF_BLOCK_BUILDER_PATH . 'includes/plugin-updater.php';
+		// Load settings
+		require_once ACF_BLOCK_BUILDER_PATH . 'includes/settings-page.php';
+		// Load Meta Boxes
+		require_once ACF_BLOCK_BUILDER_PATH . 'includes/meta-boxes.php';
+		// Load Revisions Handler
+		require_once ACF_BLOCK_BUILDER_PATH . 'includes/revisions-handler.php';
+		// Load AI Handler
+		require_once ACF_BLOCK_BUILDER_PATH . 'includes/ai-handler.php';
+
+		// ACF JSON Sync
+		add_filter( 'acf/settings/load_json', array( $this, 'add_json_load_paths' ) );
+		add_filter( 'acf/settings/save_json', array( $this, 'set_json_save_path' ) );
+	}
+
+	public function add_json_load_paths( $paths ) {
+		$upload_dir = wp_upload_dir();
+		$blocks_dir = $upload_dir['basedir'] . '/acf-blocks';
+		if ( ! file_exists( $blocks_dir ) ) {
+			return $paths;
+		}
+
+		$dirs = glob( $blocks_dir . '/*', GLOB_ONLYDIR );
+		if ( $dirs ) {
+			foreach ( $dirs as $dir ) {
+				$block_folder_name = basename( $dir );
+				$post = $this->get_block_post_by_slug( $block_folder_name );
+				
+				if ( $post ) {
+					$is_active = get_post_meta( $post->ID, '_acf_block_builder_active', true );
+					if ( '0' === $is_active ) {
+						continue;
+					}
+
+					$is_sync = get_post_meta( $post->ID, '_acf_block_builder_json_sync', true );
+					if ( '1' === $is_sync ) {
+						$paths[] = $dir;
+					}
+				}
+			}
+		}
+
+		return $paths;
+	}
+
+	public function set_json_save_path( $path ) {
+		// Only check if we are possibly saving an ACF field group
+		if ( ! isset( $_POST['acf_field_group']['key'] ) ) {
+			return $path;
+		}
+
+		$group_key = sanitize_text_field( $_POST['acf_field_group']['key'] );
+		$upload_dir = wp_upload_dir();
+		$blocks_dir = $upload_dir['basedir'] . '/acf-blocks';
+
+		if ( ! file_exists( $blocks_dir ) ) {
+			return $path;
+		}
+
+		$dirs = glob( $blocks_dir . '/*', GLOB_ONLYDIR );
+		if ( $dirs ) {
+			foreach ( $dirs as $dir ) {
+				// We need to check if this block has sync enabled AND if the group key matches the JSON file in this dir
+				$block_folder_name = basename( $dir );
+				$post = $this->get_block_post_by_slug( $block_folder_name );
+
+				if ( $post ) {
+					$is_sync = get_post_meta( $post->ID, '_acf_block_builder_json_sync', true );
+					if ( '1' !== $is_sync ) {
+						continue;
+					}
+
+					// Check if JSON file exists and contains the key
+					// ACF saves files as group_key.json usually, but let's check content or filename
+					// Actually, ACF saves as {key}.json.
+					$json_file = $dir . '/' . $group_key . '.json';
+					if ( file_exists( $json_file ) ) {
+						return $dir;
+					}
+
+					// Fallback: Check if ANY json file in this dir has this key (if filename is different for some reason)
+					// But standard ACF behavior is key.json
+					// Also, if it's a NEW save (initial sync), we might need to check if the group key matches what we generated in fields.php
+					// But fields.php is PHP.
+					// If we enabled sync, we should have generated the JSON file.
+				}
+			}
+		}
+
+		return $path;
+	}
+
+	private function get_block_post_by_slug( $slug ) {
+		$args = array(
+			'name'        => $slug,
+			'post_type'   => 'acf_block_builder',
+			'post_status' => 'any',
+			'numberposts' => 1
+		);
+		$posts = get_posts( $args );
+		return $posts ? $posts[0] : null;
+	}
+
+	public function create_uploads_directory() {
+		$upload_dir = wp_upload_dir();
+		$blocks_dir = $upload_dir['basedir'] . '/acf-blocks';
+
+		if ( ! file_exists( $blocks_dir ) ) {
+			wp_mkdir_p( $blocks_dir );
+		}
+	}
+
+	public function register_acf_blocks() {
+		$upload_dir = wp_upload_dir();
+		$blocks_dir = $upload_dir['basedir'] . '/acf-blocks';
+
+		if ( file_exists( $blocks_dir ) ) {
+			// Register blocks by iterating through subdirectories
+			$dirs = glob( $blocks_dir . '/*', GLOB_ONLYDIR );
+			if ( $dirs ) {
+				foreach ( $dirs as $dir ) {
+					// register_block_type fails to resolve URLs correctly for blocks in 'uploads'.
+					// We must manually parse block.json, register assets with correct URLs, and pass handles.
+					$block_json_path = $dir . '/block.json';
+					if ( ! file_exists( $block_json_path ) ) {
+						continue;
+					}
+
+					// Load Custom Assets File if it exists (assets.php)
+					if ( file_exists( $dir . '/assets.php' ) ) {
+						require_once $dir . '/assets.php';
+					}
+
+					$metadata = json_decode( file_get_contents( $block_json_path ), true );
+					if ( ! $metadata ) {
+						continue;
+					}
+
+					$args = array();
+					$block_folder_name = basename( $dir );
+					
+					// Check if block is active
+					$active_check_args = array(
+						'name'        => $block_folder_name,
+						'post_type'   => 'acf_block_builder',
+						'post_status' => 'any',
+						'numberposts' => 1
+					);
+					$active_check_posts = get_posts( $active_check_args );
+					if ( $active_check_posts ) {
+						$is_active = get_post_meta( $active_check_posts[0]->ID, '_acf_block_builder_active', true );
+						// If explicitly disabled (saved as '0'), skip. Default is active.
+						if ( '0' === $is_active ) {
+							continue;
+						}
+					}
+
+					$block_url = $upload_dir['baseurl'] . '/acf-blocks/' . $block_folder_name;
+
+					// Handle Style
+					if ( isset( $metadata['style'] ) ) {
+						$styles = (array) $metadata['style'];
+						foreach ( $styles as $style_path ) {
+							if ( is_string( $style_path ) && strpos( $style_path, 'file:' ) === 0 ) {
+								$filename = str_replace( array( 'file:./', 'file:' ), '', $style_path );
+								$handle   = 'acf-block-' . $block_folder_name . '-style';
+								$file_url = $block_url . '/' . $filename;
+								$file_path = $dir . '/' . $filename;
+
+								if ( file_exists( $file_path ) ) {
+									wp_register_style( $handle, $file_url, array(), filemtime( $file_path ) );
+									// Only one style handle can be passed to register_block_type as string, 
+									// or an array of handles. We'll simplify to just overriding the first one found or adding to array.
+									// For simplicity in this fix, we replace the args['style'] with our handle.
+									$args['style'] = $handle;
+								}
+							}
+						}
+					}
+
+					// Handle Script
+					if ( isset( $metadata['script'] ) ) {
+						$scripts = (array) $metadata['script'];
+						foreach ( $scripts as $script_path ) {
+							if ( is_string( $script_path ) && strpos( $script_path, 'file:' ) === 0 ) {
+								$filename = str_replace( array( 'file:./', 'file:' ), '', $script_path );
+								$handle   = 'acf-block-' . $block_folder_name . '-script';
+								$file_url = $block_url . '/' . $filename;
+								$file_path = $dir . '/' . $filename;
+
+							if ( file_exists( $file_path ) ) {
+								// Add jQuery as dependency
+								wp_register_script( $handle, $file_url, array( 'jquery' ), filemtime( $file_path ), true );
+								$args['script'] = $handle;
+							}
+							}
+						}
+					}
+
+					register_block_type( $dir, $args );
+				}
+			}
+		}
+	}
+
+	public function register_acf_fields() {
+		$upload_dir = wp_upload_dir();
+		$blocks_dir = $upload_dir['basedir'] . '/acf-blocks';
+
+		if ( file_exists( $blocks_dir ) ) {
+			// Load field definitions (fields.php) for each block
+			$dirs = glob( $blocks_dir . '/*', GLOB_ONLYDIR );
+			if ( $dirs ) {
+				foreach ( $dirs as $dir ) {
+					// Check if block is active (same logic as register_acf_blocks)
+					$block_folder_name = basename( $dir );
+					$active_check_args = array(
+						'name'        => $block_folder_name,
+						'post_type'   => 'acf_block_builder',
+						'post_status' => 'any',
+						'numberposts' => 1
+					);
+					$active_check_posts = get_posts( $active_check_args );
+					if ( $active_check_posts ) {
+						$is_active = get_post_meta( $active_check_posts[0]->ID, '_acf_block_builder_active', true );
+						if ( '0' === $is_active ) {
+							continue;
+						}
+
+						// Check for JSON Sync
+						$is_sync = get_post_meta( $active_check_posts[0]->ID, '_acf_block_builder_json_sync', true );
+						if ( '1' === $is_sync ) {
+							// Skip requiring fields.php if sync is enabled
+							// ACF will load from JSON via 'add_json_load_paths'
+							continue;
+						}
+					}
+
+					if ( file_exists( $dir . '/fields.php' ) ) {
+						require_once $dir . '/fields.php';
+					}
+				}
+			}
+		}
+	}
+
+	public function register_post_type() {
+		register_post_type( 'acf_block_builder', array(
+			'labels' => array(
+				'name'               => __( 'ACF Blocks', 'acf-block-builder' ),
+				'singular_name'      => __( 'ACF Block', 'acf-block-builder' ),
+				'add_new'            => __( 'Add New Block', 'acf-block-builder' ),
+				'add_new_item'       => __( 'Add New ACF Block', 'acf-block-builder' ),
+				'edit_item'          => __( 'Edit ACF Block', 'acf-block-builder' ),
+				'new_item'           => __( 'New ACF Block', 'acf-block-builder' ),
+				'view_item'          => __( 'View ACF Block', 'acf-block-builder' ),
+				'search_items'       => __( 'Search ACF Blocks', 'acf-block-builder' ),
+				'not_found'          => __( 'No ACF Blocks found', 'acf-block-builder' ),
+				'not_found_in_trash' => __( 'No ACF Blocks found in Trash', 'acf-block-builder' ),
+			),
+			'public'      => false,
+			'show_ui'     => true,
+			'show_in_menu'=> true,
+			'supports'    => array( 'title', 'revisions' ), // We will add custom metaboxes for description/AI prompts
+			'menu_icon'   => 'dashicons-layout',
+		));
+	}
+}
+
+new ACF_Block_Builder();

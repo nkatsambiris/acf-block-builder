@@ -1,0 +1,418 @@
+.acf-block-builder-container {
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    position: relative;
+}
+
+/* Chat Interface */
+.acf-bb-chat-interface {
+    background: #fff;
+    border: 1px solid #e2e4e7;
+    border-radius: 4px;
+    margin-bottom: 25px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    height: 600px; /* Fixed height for chat window */
+}
+
+.acf-bb-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e2e4e7;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.acf-bb-message {
+    display: flex;
+    gap: 15px;
+    max-width: 80%;
+}
+
+.acf-bb-message.user-message {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+}
+
+.acf-bb-message.ai-message {
+    align-self: flex-start;
+}
+
+.acf-bb-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #e2e4e7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ai-message .acf-bb-avatar {
+    background: #2271b1;
+    color: #fff;
+}
+
+.user-message .acf-bb-avatar {
+    background: #1d2327;
+    color: #fff;
+}
+
+.acf-bb-message-content {
+    background: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    font-size: 14px;
+    line-height: 1.5;
+    color: #3c434a;
+}
+
+.acf-bb-typing::after {
+    content: '...';
+    animation: acf-bb-dots 1.5s steps(4, end) infinite;
+    display: inline-block;
+    width: 0;
+    overflow: hidden;
+    vertical-align: bottom;
+}
+
+@keyframes acf-bb-dots {
+    to { width: 1.25em; }
+}
+
+.acf-bb-timer-pill {
+    font-size: 11px;
+    background: #f0f0f1;
+    color: #646970;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+    font-family: 'Monaco', 'Consolas', monospace;
+}
+
+.user-message .acf-bb-message-content {
+    background: #e7f5ff; /* Slight blue tint for user */
+}
+
+.acf-bb-chat-image img {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 4px;
+    margin-top: 10px;
+    border: 1px solid #ddd;
+}
+
+.acf-bb-chat-input-area {
+    padding: 20px;
+    background: #fff;
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.acf-bb-chat-tools {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+}
+
+.acf-bb-chat-tools button#acf-bb-upload-image {
+    height: 50px;
+    display: flex;
+    align-items: center;
+}
+
+.acf-bb-chat-input-area textarea {
+    flex: 1;
+    min-height: 50px;
+    max-height: 150px;
+    padding: 12px;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    resize: vertical;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.acf-bb-chat-input-area textarea:focus {
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+    outline: none;
+}
+
+.acf-bb-chat-input-area button.button-primary {
+    height: 50px;
+    width: 44px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
+
+.acf-bb-chat-input-area button.button-primary .dashicons {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+}
+
+/* Loading Overlay */
+.acf-bb-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(5px);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.acf-bb-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.acf-bb-overlay-content {
+    background: #fff;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    text-align: center;
+    max-width: 400px;
+    width: 100%;
+    border: 1px solid #e2e4e7;
+}
+
+.acf-bb-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #2271b1;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    animation: acf-bb-spin 1s linear infinite;
+}
+
+@keyframes acf-bb-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.acf-bb-loading-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1d2327;
+    margin-bottom: 10px;
+    min-height: 27px; /* Prevent layout shift */
+}
+
+.acf-bb-timer {
+    font-family: 'Monaco', 'Consolas', monospace;
+    font-size: 14px;
+    color: #646970;
+    background: #f0f0f1;
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 15px;
+}
+
+/* Code Editor Section */
+.code-editors-section {
+    background: #fff;
+    border: 1px solid #e2e4e7;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+/* Tabs */
+.acf-bb-tabs {
+    display: flex;
+    background: #f0f0f1;
+    border-bottom: 1px solid #e2e4e7;
+    padding: 0;
+    margin: 0;
+}
+
+.acf-bb-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 20px;
+    text-decoration: none;
+    color: #50575e;
+    font-size: 13px;
+    font-weight: 500;
+    border-right: 1px solid #e2e4e7;
+    background: transparent;
+    transition: background 0.2s, color 0.2s;
+}
+
+.acf-bb-tab:hover {
+    background: #f6f7f7;
+    color: #1d2327;
+}
+
+.acf-bb-tab.active {
+    background: #fff;
+    color: #2271b1;
+    font-weight: 600;
+    border-bottom: 1px solid transparent;
+    margin-bottom: -1px; /* Overlap border */
+    position: relative;
+}
+
+.acf-bb-tab .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: #8c8f94;
+}
+
+.acf-bb-tab.active .dashicons {
+    color: #2271b1;
+}
+
+/* Editor Wrapper */
+.acf-bb-editor-wrapper {
+    position: relative;
+    background: #fff;
+}
+
+.acf-bb-tab-content {
+    display: none;
+    width: 100%;
+}
+
+.acf-bb-tab-content.active {
+    display: block;
+}
+
+.monaco-editor-container {
+    height: 500px;
+    width: 100%;
+    border: none;
+}
+
+.hidden-textarea {
+    display: none !important;
+}
+
+/* Toggle Switch */
+.acf-bb-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+}
+
+.acf-bb-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.acf-bb-toggle-switch .slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 20px;
+}
+
+.acf-bb-toggle-switch .slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+.acf-bb-toggle-switch input:checked + .slider {
+  background-color: #2271b1;
+}
+
+.acf-bb-toggle-switch input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+/* Diff Overlay */
+.acf-bb-diff-content {
+    max-width: 90% !important;
+    width: 90% !important;
+    height: 90vh;
+    padding: 0 !important;
+    display: flex;
+    flex-direction: column;
+    text-align: left !important;
+}
+
+.acf-bb-diff-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #e2e4e7;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fff;
+}
+
+.acf-bb-diff-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #1d2327;
+}
+
+.acf-bb-diff-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.acf-bb-diff-tabs {
+    background: #f0f0f1;
+    border-bottom: 1px solid #e2e4e7;
+}
+
+.acf-bb-diff-tabs .acf-bb-tab {
+    cursor: pointer;
+}
+
+/* Highlight changed tabs */
+.acf-bb-tab.has-changes {
+    color: #d63638; /* Red/Orange to indicate change */
+}
+
+.acf-bb-tab.has-changes::after {
+    content: '•';
+    color: #d63638;
+    margin-left: 5px;
+    font-size: 16px;
+}
+
+#acf-bb-diff-editor-container {
+    flex: 1;
+    width: 100%;
+    border: none;
+}

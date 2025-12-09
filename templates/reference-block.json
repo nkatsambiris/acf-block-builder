@@ -1,0 +1,21 @@
+{
+  "name": "acf/block-slug",
+  "title": "Block Title",
+  "description": "Block Description",
+  "style": "file:./style.css",
+  "script": "file:./script.js",
+  "category": "common",
+  "icon": "star-filled",
+  "keywords": ["keyword1", "keyword2"],
+  "acf": {
+    "renderTemplate": "render.php",
+    "mode": "preview",
+    "blockVersion": 3,
+    "autoInlineEditing": true
+  },
+  "supports": {
+    "align": true,
+    "anchor": true,
+    "mode": true
+  }
+}
