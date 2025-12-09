@@ -1,11 +1,28 @@
 <?php
 /**
- * Plugin Name: ACF Block Builder
- * Description: A tool to easily create and manage ACF Blocks using AI and an internal code editor.
- * Version: 1.0.0
- * Author: Your Name
- * Text Domain: acf-block-builder
- */
+* Plugin Name: ACF Block Builder
+* Description: A tool to easily create and manage ACF Blocks using AI and an internal code editor.
+* Version: 1.0.0
+* Author: Nicholas Katsambiris
+* Update URI: acf-block-builder
+* License: MIT
+* Tested up to: 6.8.2
+* Requires at least: 6.3
+* Requires PHP: 8.0
+*
+* This program is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
