@@ -2,11 +2,11 @@
 /**
 * Plugin Name: ACF Block Builder
 * Description: A tool to easily create and manage ACF Blocks using AI and an internal code editor.
-* Version: 1.0.1
+* Version: 1.0.2
 * Author: Nicholas Katsambiris
 * Update URI: acf-block-builder
 * License: MIT
-* Tested up to: 6.8.2
+* Tested up to: 6.9
 * Requires at least: 6.3
 * Requires PHP: 8.0
 *
@@ -30,7 +30,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'ACF_BLOCK_BUILDER_PATH', plugin_dir_path( __FILE__ ) );
 define( 'ACF_BLOCK_BUILDER_URL', plugin_dir_url( __FILE__ ) );
-define( 'ACF_BLOCK_BUILDER_VERSION', '1.0.1' );
+define( 'ACF_BLOCK_BUILDER_FILE', __FILE__ );
+define( 'ACF_BLOCK_BUILDER_VERSION', '1.0.0' );
 
 class ACF_Block_Builder {
 

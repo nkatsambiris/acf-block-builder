@@ -55,27 +55,44 @@ class ACF_Block_Builder_Plugin_Updater {
 }
 
 function acf_block_builder_check_for_update($transient) {
-    if (empty($transient->checked)) {
-        return $transient;
+    // Debug logging if enabled - Moved to top to capture early exits
+    $debug_enabled = get_option('acf_block_builder_debug_enabled');
+    
+    // Get the correct plugin file path (main plugin file, not this included file)
+    $plugin_file = defined('ACF_BLOCK_BUILDER_FILE') ? ACF_BLOCK_BUILDER_FILE : dirname(dirname(__FILE__)) . '/acf-block-builder.php';
+    $plugin_basename = plugin_basename($plugin_file);
+    
+    if ($debug_enabled) {
+        error_log('ACF Block Builder Updater: Checking for updates.');
+        error_log('ACF Block Builder Updater: Calculated Plugin Basename: ' . $plugin_basename);
     }
 
-    // Get the plugin basename correctly
-    $plugin_basename = plugin_basename(__FILE__);
+    if (empty($transient->checked)) {
+        if ($debug_enabled) {
+             error_log('ACF Block Builder Updater: Transient checked is empty.');
+        }
+        return $transient;
+    }
 
     // Check if this plugin is in the checked list
     if (!isset($transient->checked[$plugin_basename])) {
+         // This is common, as WP checks plugins in batches or individually. 
+         // But if we are looking for OUR plugin update, it must be in the list of installed plugins being checked.
+         // However, $transient->checked uses the basename as key.
+         // If it's not there, maybe it's not active or WP isn't checking it right now.
+         // Let's log it.
+         if ($debug_enabled) {
+             error_log('ACF Block Builder Updater: Plugin not in checked list. Checked list keys: ' . implode(', ', array_keys($transient->checked)));
+         }
         return $transient;
     }
 
-    // Get current version from plugin header
-    $plugin_data = get_plugin_data(__FILE__);
+    // Get current version from main plugin file
+    $plugin_data = get_plugin_data($plugin_file);
     $current_version = $plugin_data['Version'];
 
-    // Debug logging if enabled
-    $debug_enabled = get_option('acf_block_builder_debug_enabled');
     if ($debug_enabled) {
-        error_log('ACF Block Builder Updater: Checking for updates. Current version: ' . $current_version);
-        error_log('ACF Block Builder Updater: Plugin basename: ' . $plugin_basename);
+        error_log('ACF Block Builder Updater: Current version: ' . $current_version);
     }
 
     $updater = new ACF_Block_Builder_Plugin_Updater($current_version, 'https://raw.githubusercontent.com/nkatsambiris/acf-block-builder/main/updates.json', $plugin_basename);
@@ -110,7 +127,8 @@ add_filter('pre_set_site_transient_update_plugins', 'acf_block_builder_check_for
 
 // Displayed in the plugin info window
 function acf_block_builder_plugin_info($false, $action, $args) {
-    $plugin_basename = plugin_basename(__FILE__);
+    $plugin_file = defined('ACF_BLOCK_BUILDER_FILE') ? ACF_BLOCK_BUILDER_FILE : dirname(dirname(__FILE__)) . '/acf-block-builder.php';
+    $plugin_basename = plugin_basename($plugin_file);
     $plugin_slug = dirname($plugin_basename);
 
     if (isset($args->slug) && $args->slug === $plugin_slug) {
@@ -148,7 +166,8 @@ add_filter('plugins_api', 'acf_block_builder_plugin_info', 10, 3);
 
 // Used to handle the plugin folder name during updates
 function acf_block_builder_upgrader_package_options($options) {
-    $plugin_basename = plugin_basename(__FILE__);
+    $plugin_file = defined('ACF_BLOCK_BUILDER_FILE') ? ACF_BLOCK_BUILDER_FILE : dirname(dirname(__FILE__)) . '/acf-block-builder.php';
+    $plugin_basename = plugin_basename($plugin_file);
 
     if (isset($options['hook_extra']['plugin']) && $options['hook_extra']['plugin'] === $plugin_basename) {
         $plugin_slug = dirname($plugin_basename);
