@@ -1,13 +1,13 @@
 {
     "name": "ACF Block Builder",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "author": "Nicholas Katsambiris",
     "requires": "6.3",
     "tested": "6.8.2",
     "last_updated": "2025-12-10",
     "sections": {
         "description": "<p>A WordPress plugin that allows you to create and manage ACF Blocks using AI and an internal code editor.</p><h3>Installation</h3><ol><li>Download the plugin from the <a href=\"https://github.com/nkatsambiris/acf-block-builder\">GitHub repository</a>.</li><li>Log in to your WordPress dashboard.</li><li>Go to Plugins > Add New.</li><li>Click on the Upload Plugin button, and choose the downloaded zip file.</li><li>Click on Install Now and then Activate.</li></ol><h3>Updating Settings</h3><ol><li>Go to Settings > ACF Block Builder.</li><li>Enter your Google Gemini API Key (get it from <a href=\"https://aistudio.google.com/app/apikey\" target=\"_blank\">Google AI Studio</a>).</li><li>Click on Save Changes.</li></ol><h3>Creating a New Block</h3><ol><li>Go to ACF Blocks > Add New.</li><li>Enter a title for the block.</li><li>Enter a description for the block.</li><li>Click on the Create Block button.</li></ol><h3>Editing a Block</h3><ol><li>Go to ACF Blocks > Edit.</li><li>Enter a title for the block.</li><li>Enter a description for the block.</li><li>Click on the Update Block button.</li></ol><h3>Deleting a Block</h3><ol><li>Go to ACF Blocks > Delete.</li><li>Click on the Delete Block button.</li></ol>",
-        "changelog": "<strong>1.0.4</strong><ul></li>Improvements to error logging and debugging</li></ul><strong>1.0.3</strong><ul></li>Improve AI prompt for handling array values</li><li>Check to ensure ACF PRO 6.7.0 or greater is active</li></ul><strong>1.0.2</strong><ul></li>Resolve issue with updater</li></ul><strong>1.0.1</strong><ul></li>Version bump for update checker</li></ul><strong>1.0.0</strong><ul></li>Initial plugin release</li></ul>"
+        "changelog": "<strong>1.0.5</strong><ul></li>Updates to styling on edit block screen</li><li>AI summary given in chat window</li></ul><strong>1.0.4</strong><ul></li>Improvements to error logging and debugging</li></ul><strong>1.0.3</strong><ul></li>Improve AI prompt for handling array values</li><li>Check to ensure ACF PRO 6.7.0 or greater is active</li></ul><strong>1.0.2</strong><ul></li>Resolve issue with updater</li></ul><strong>1.0.1</strong><ul></li>Version bump for update checker</li></ul><strong>1.0.0</strong><ul></li>Initial plugin release</li></ul>"
     },
     "download_link": "https://github.com/nkatsambiris/acf-block-builder/archive/refs/heads/main.zip"
 }

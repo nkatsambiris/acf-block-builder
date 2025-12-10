@@ -124,8 +124,17 @@ class ACF_Block_Builder_Meta_Boxes {
 	public function add_meta_boxes() {
 		add_meta_box(
 			'acf_block_builder_editor',
-			__( 'Block Editor', 'acf-block-builder' ),
-			array( $this, 'render_editor_meta_box' ),
+			__( 'AI Block Builder', 'acf-block-builder' ),
+			array( $this, 'render_chat_meta_box' ),
+			'acf_block_builder',
+			'normal',
+			'high'
+		);
+
+		add_meta_box(
+			'acf_block_builder_code',
+			__( 'Code Editor', 'acf-block-builder' ),
+			array( $this, 'render_code_meta_box' ),
 			'acf_block_builder',
 			'normal',
 			'high'
@@ -161,7 +170,7 @@ class ACF_Block_Builder_Meta_Boxes {
 		}
 		?>
 		<div class="acf-bb-sidebar-actions">
-			<div class="acf-bb-status-toggle" style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #ddd;">
+			<div class="acf-bb-status-toggle" style="margin-top: 15px; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #ddd;">
 				<label for="acf_block_builder_active" style="display: flex; align-items: center; cursor: pointer; justify-content: space-between;">
 					<span style="font-weight: 600;"><?php _e( 'Block Status', 'acf-block-builder' ); ?></span>
 					<div class="acf-bb-toggle-switch">
@@ -283,7 +292,7 @@ class ACF_Block_Builder_Meta_Boxes {
 			}
 		}
 
-		echo '<table class="widefat striped">';
+		echo '<table class="widefat striped acf-bb-fields-table">';
 		echo '<thead><tr><th>' . __( 'Label', 'acf-block-builder' ) . '</th><th>' . __( 'Name', 'acf-block-builder' ) . '</th><th>' . __( 'Type', 'acf-block-builder' ) . '</th></tr></thead>';
 		echo '<tbody>';
 		foreach ( $fields as $field ) {
@@ -302,17 +311,10 @@ class ACF_Block_Builder_Meta_Boxes {
 		echo '</table>';
 	}
 
-	public function render_editor_meta_box( $post ) {
+	public function render_chat_meta_box( $post ) {
 		wp_nonce_field( 'acf_block_builder_save', 'acf_block_builder_nonce' );
 
-		// Get existing values
-		$block_json = get_post_meta( $post->ID, '_acf_block_builder_json', true );
-		$block_php  = get_post_meta( $post->ID, '_acf_block_builder_php', true );
-		$block_css  = get_post_meta( $post->ID, '_acf_block_builder_css', true );
-		$block_js   = get_post_meta( $post->ID, '_acf_block_builder_js', true );
-		$fields_php = get_post_meta( $post->ID, '_acf_block_builder_fields', true );
-		$assets_php = get_post_meta( $post->ID, '_acf_block_builder_assets', true );
-		$ai_prompt  = get_post_meta( $post->ID, '_acf_block_builder_prompt', true );
+		// Get chat history
 		$chat_history_json = get_post_meta( $post->ID, '_acf_block_builder_chat_history', true );
 		$chat_history = json_decode( $chat_history_json, true );
 		if ( ! is_array( $chat_history ) ) {
@@ -396,7 +398,21 @@ class ACF_Block_Builder_Meta_Boxes {
 					<div id="acf-bb-diff-editor-container" class="monaco-editor-container" style="height: 60vh;"></div>
 				</div>
 			</div>
-			
+		</div>
+		<?php
+	}
+
+	public function render_code_meta_box( $post ) {
+		// Get existing values
+		$block_json = get_post_meta( $post->ID, '_acf_block_builder_json', true );
+		$block_php  = get_post_meta( $post->ID, '_acf_block_builder_php', true );
+		$block_css  = get_post_meta( $post->ID, '_acf_block_builder_css', true );
+		$block_js   = get_post_meta( $post->ID, '_acf_block_builder_js', true );
+		$fields_php = get_post_meta( $post->ID, '_acf_block_builder_fields', true );
+		$assets_php = get_post_meta( $post->ID, '_acf_block_builder_assets', true );
+		
+		?>
+		<div class="acf-block-builder-container">
 			<div class="code-editors-section">
 				<div class="acf-bb-tabs">
 					<a href="#" class="acf-bb-tab active" data-tab="block-json">

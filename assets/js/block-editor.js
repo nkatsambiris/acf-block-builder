@@ -26,6 +26,90 @@ jQuery(document).ready(function($) {
     // Scroll on load
     scrollToBottom();
 
+    // Enhanced Header UI
+    function initEnhancedHeader() {
+        if (!$('body').hasClass('post-type-acf_block_builder')) return;
+
+        // Create Header Bar
+        var $header = $('<div class="acf-bb-header-bar"></div>');
+        var $inner = $('<div class="acf-bb-header-inner"></div>');
+        
+        // Label
+        var $label = $('<div class="acf-bb-header-label">Edit Block</div>');
+        if ($('body').hasClass('post-new-php')) {
+            $label.text('New Block');
+        }
+        
+        // Title Area
+        var $titleArea = $('<div class="acf-bb-title-area"></div>');
+        var $titleInput = $('#title');
+        
+        // Clone the input to avoid breaking WP's internal references to the original DOM element?
+        // No, moving it is better so we keep the ID and value sync. 
+        // But we need to be careful about events.
+        // However, WP often binds to #title on document ready. If we move it after, it should be fine as long as it's still in DOM.
+        // But let's check if we are too late. $(document).ready runs after WP's scripts usually.
+        
+        if ($titleInput.length) {
+            $titleInput.attr('placeholder', 'Block Name');
+            $titleArea.append($titleInput);
+        }
+
+        // Actions Area
+        var $actions = $('<div class="acf-bb-header-actions"></div>');
+        var $publishBtn = $('#publish');
+        
+        if ($publishBtn.length) {
+            // Create a proxy button instead of moving the real one
+            // Moving the real one out of the form breaks submission in some WP versions
+            var $proxyBtn = $('<button type="button" class="button button-primary button-large acf-bb-save-button">Save Changes</button>');
+            
+            // Handle click
+            $proxyBtn.on('click', function(e) {
+                e.preventDefault();
+                $(this).text('Updating...').prop('disabled', true);
+                $publishBtn.click();
+            });
+
+            $actions.append($proxyBtn);
+        }
+        
+        $inner.append($label);
+        $inner.append($titleArea);
+        $inner.append($actions);
+        $header.append($inner);
+        
+        // Inject at top of wrap
+        var $wrap = $('.wrap');
+        if ($wrap.length) {
+            $wrap.prepend($header);
+            $('body').addClass('acf-bb-enhanced-ui');
+        }
+        
+        // Cleanup original UI
+        // We moved #title, so #titlediv is empty-ish.
+        // But #titlediv also contains #title-prompt-text (label) and permalink box.
+        // We should probably hide #titlediv but ensure permalink box is handled if needed.
+        // For now, let's just hide the prompt text.
+        $('#title-prompt-text').hide();
+        $('#titlediv').css('margin-bottom', '0').hide(); // Hide the container
+        
+        // Hide publishing actions but keep them in DOM for the form submission to work
+        // We don't move #publish anymore, we just hide the container
+        // $('#submitdiv').hide();
+        // $('.submitbox').hide();
+        // $('#major-publishing-actions').hide();
+        // $('#delete-action').hide();
+        // $('#publishing-action').hide();
+        
+        // Hide default headings
+        $('.wp-heading-inline').hide();
+        $('.page-title-action').hide();
+    }
+
+    // Run enhancement
+    initEnhancedHeader();
+
     function appendMessage(type, content, imageUrl, skipSave) {
         var icon = type === 'ai' ? 'superhero' : 'admin-users';
         var html = '<div class="acf-bb-message ' + type + '-message">';
@@ -260,7 +344,14 @@ jQuery(document).ready(function($) {
         });
 
         $('#acf-bb-diff-overlay').removeClass('visible').hide();
-        appendMessage('ai', 'Changes applied successfully.');
+        
+        var message = 'Changes applied successfully.';
+        if (pendingAIChanges.summary) {
+            message = pendingAIChanges.summary;
+        }
+        appendMessage('ai', message);
+        
+        pendingAIChanges = null;
     });
 
     // Discard Changes
@@ -482,7 +573,4 @@ jQuery(document).ready(function($) {
             }
         });
     });
-
-    // Add Theme Loader
-    // Logic moved to settings page.
 });

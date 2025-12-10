@@ -79,6 +79,7 @@ class ACF_Block_Builder_AI {
 		   - Use 'acf_inline_toolbar_editing_attrs( array( 'field_name' ) )' for images/links.
 		
 		You must return ONLY a valid JSON object with the following keys:
+		- 'summary': A brief, human-readable summary of the changes made (e.g., \"Added a new text field for the title and updated the render template.\").
 		- 'block_json': The content of block.json. Adapt the reference to the user's block. Ensure 'blockVersion': 3 and 'autoInlineEditing': true. IMPORTANT: Add 'script' property pointing to 'file:./script.js'.
 		- 'render_php': The PHP code for render.php. Use 'get_field()' and inline editing attributes. REMEMBER THE CRITICAL ERROR PREVENTION: check `is_array()` for all complex fields.
 		- 'style_css': The CSS code for style.css.
@@ -90,7 +91,7 @@ class ACF_Block_Builder_AI {
 		";
 
 		if ( ! empty( $current_code ) ) {
-			$full_prompt = "Block Title: $title\nBlock Slug: $slug\n\nCURRENT CODE CONTEXT (JSON):\n$current_code\n\nUSER MODIFICATION REQUEST:\n$user_prompt\n\nPlease update the code based on the user's request. Return the FULL updated code for all files (block_json, render_php, style_css, script_js, fields_php, assets_php), even if some are unchanged.";
+			$full_prompt = "Block Title: $title\nBlock Slug: $slug\n\nCURRENT CODE CONTEXT (JSON):\n$current_code\n\nUSER MODIFICATION REQUEST:\n$user_prompt\n\nPlease update the code based on the user's request. Return the FULL updated code for all files (block_json, render_php, style_css, script_js, fields_php, assets_php), even if some are unchanged. ALSO provide a 'summary' key explaining what you changed.";
 		} else {
 			$full_prompt = "Block Title: $title\nBlock Slug: $slug\nDescription: $user_prompt";
 		}
