@@ -339,7 +339,13 @@ class ACF_Block_Builder_Meta_Boxes {
 									<span class="dashicons dashicons-<?php echo $msg['type'] === 'ai' ? 'superhero' : 'admin-users'; ?>"></span>
 								</div>
 								<div class="acf-bb-message-content">
-									<?php echo wp_kses_post( $msg['content'] ); ?>
+									<?php 
+                                    // Use specific allowed HTML for chat history to prevent breaking layout
+                                    // while allowing code blocks and custom widgets.
+                                    // wp_kses_post strips style tags and some attributes.
+                                    // We need to be more permissive for our internal chat storage.
+                                    echo $msg['content']; 
+                                    ?>
 									<?php if ( ! empty( $msg['image_url'] ) ) : ?>
 										<div class="acf-bb-chat-image">
 											<img src="<?php echo esc_url( $msg['image_url'] ); ?>" alt="Reference">

@@ -65,6 +65,7 @@
     font-size: 14px;
     line-height: 1.5;
     color: #3c434a;
+    min-width: 0; 
 }
 
 .acf-bb-typing::after {
@@ -609,4 +610,102 @@
 /* Indentation markers style update */
 .acf-bb-fields-table .dashicons-arrow-return-right {
     color: #94a3b8;
+}
+
+/* Code Widget in Chat */
+.acf-bb-code-widget {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    background: #1e1e1e; /* Dark theme */
+    overflow: hidden;
+    width: 100%; /* Ensure it fits */
+}
+
+.acf-bb-code-header {
+    background: #2d2d2d;
+    color: #ccc;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-family: monospace;
+    border-bottom: 1px solid #333;
+    display: flex;
+    align-items: center;
+}
+
+.acf-bb-code-header .dashicons {
+    font-size: 14px;
+    margin-right: 5px;
+    width: 14px;
+    height: 14px;
+}
+
+.acf-bb-code-body {
+    margin: 0;
+    padding: 10px;
+    overflow-x: auto;
+    color: #d4d4d4;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12px;
+    white-space: pre-wrap; /* Wrap lines */
+    word-wrap: break-word; /* Ensure long lines break */
+}
+
+/* Summary Widget */
+.acf-bb-summary-widget {
+    margin-top: 15px;
+    margin-bottom: 15px;
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.acf-bb-summary-header {
+    background: #f0f0f1;
+    padding: 10px 15px;
+    font-weight: 600;
+    color: #1d2327;
+    border-bottom: 1px solid #dcdcde;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.acf-bb-summary-list {
+    margin: 0;
+    padding: 10px 15px;
+    list-style: none;
+}
+
+.acf-bb-summary-list li {
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #3c434a;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.acf-bb-summary-list li:last-child {
+    margin-bottom: 0;
+}
+
+.acf-bb-summary-list li .dashicons {
+    color: #2271b1;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.acf-bb-plan-content {
+    padding: 15px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #3c434a;
+}
+
+.acf-bb-plan-content div {
+    margin-bottom: 8px;
 }

@@ -18,6 +18,11 @@ class ACF_Block_Builder_AI {
 			wp_send_json_error( 'Permission denied.' );
 		}
 
+		// Close session to prevent locking if applicable
+		if ( session_status() === PHP_SESSION_ACTIVE ) {
+			session_write_close();
+		}
+
 		$prompt = isset( $_POST['prompt'] ) ? sanitize_textarea_field( $_POST['prompt'] ) : '';
 		$title  = isset( $_POST['title'] ) ? sanitize_text_field( $_POST['title'] ) : 'New Block';
 		$image_id = isset( $_POST['image_id'] ) ? absint( $_POST['image_id'] ) : 0;
@@ -32,13 +37,16 @@ class ACF_Block_Builder_AI {
 			wp_send_json_error( 'Gemini API Key is missing. Please set it in the settings.' );
 		}
 
-		$generated_code = $this->call_gemini_api( $api_key, $prompt, $title, $image_id, $current_code );
+		// Enable Streaming Headers
+		header( 'Content-Type: text/event-stream' );
+		header( 'Cache-Control: no-cache' );
+		header( 'Connection: keep-alive' );
+		header( 'X-Accel-Buffering: no' ); // Disable Nginx buffering
 
-		if ( is_wp_error( $generated_code ) ) {
-			wp_send_json_error( $generated_code->get_error_message() );
-		}
-
-		wp_send_json_success( $generated_code );
+		// Call streaming API
+		$this->stream_gemini_api( $api_key, $prompt, $title, $image_id, $current_code );
+		
+		die(); // Terminate WP execution
 	}
 
 	private function log( $message ) {
@@ -47,8 +55,8 @@ class ACF_Block_Builder_AI {
 		}
 	}
 
-	private function call_gemini_api( $api_key, $user_prompt, $title, $image_id = 0, $current_code = '' ) {
-		$url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=' . $api_key;
+	private function stream_gemini_api( $api_key, $user_prompt, $title, $image_id = 0, $current_code = '' ) {
+		$url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:streamGenerateContent?key=' . $api_key;
 
 		$slug = sanitize_title( $title );
 		
@@ -56,52 +64,75 @@ class ACF_Block_Builder_AI {
 		$ref_block_json = file_get_contents( ACF_BLOCK_BUILDER_PATH . 'templates/reference-block.json' );
 		$ref_script_js  = file_get_contents( ACF_BLOCK_BUILDER_PATH . 'templates/reference-script.js' );
 
-		$system_instruction = "You are an expert WordPress developer specializing in Advanced Custom Fields (ACF) Blocks. 
-		Your task is to generate or update the code for an ACF Block based on the user's description (and optional reference image).
-
-		CRITICAL ERROR PREVENTION - YOU MUST FOLLOW THIS:
-		- You MUST verify that complex fields (Link, Image, File, Post Object, Relationship, Taxonomy) are arrays before accessing their keys.
-		- The most common error is: 'Uncaught TypeError: Cannot access offset of type string on string'. This happens when you try to access keys like `\$link['url']` but `\$link` is an empty string.
-		- CORRECT PATTERN: `if ( ! empty( \$link ) && is_array( \$link ) ) { ... \$link['url'] ... }`
-		- INCORRECT PATTERN: `if ( \$link ) { ... }` (This is NOT sufficient for array fields).
-		- ALWAYS initialize variables to avoid undefined variable warnings.
+		$system_instruction = "You are an expert WordPress developer specializing in Advanced Custom Fields (ACF) Blocks.
 		
-		IMPORTANT: FOLLOW THESE REFERENCE STRUCTURES EXACTLY.
+		FLUID STREAMING MODE:
+		1. You must communicate your thought process and code updates in a specific streaming format.
+		2. First, PLAN and CHAT with the user in plain text.
+		3. Then, when you are ready to write code for a specific file, use the delimiters below.
 		
-		1. 'block.json' Structure:
-		$ref_block_json
+		STREAMING FORMAT DELIMITERS:
+		To start a file: @@@FILE:file_key@@@
+		To end a file:   @@@END_FILE@@@
 		
-		2. 'script.js' Structure (Use jQuery wrapper and acf.addAction):
-		$ref_script_js
+		Valid 'file_key' values:
+		- plan (Use this for the initial step-by-step plan)
+		- block_json
+		- render_php
+		- style_css
+		- script_js
+		- fields_php
+		- assets_php
+		- summary  (Use this for the final changelog summary)
 		
-		3. Inline Editing (ACF Blocks v3):
-		   - Use 'acf_inline_text_editing_attrs( 'field_name' )' for text elements.
-		   - Use 'acf_inline_toolbar_editing_attrs( array( 'field_name' ) )' for images/links.
+		EXAMPLE INTERACTION:
+		\"I will start by creating a plan...\"
 		
-		You must return ONLY a valid JSON object with the following keys:
-		- 'summary': A brief, human-readable summary of the changes made (e.g., \"Added a new text field for the title and updated the render template.\").
-		- 'block_json': The content of block.json. Adapt the reference to the user's block. Ensure 'blockVersion': 3 and 'autoInlineEditing': true. IMPORTANT: Add 'script' property pointing to 'file:./script.js'.
-		- 'render_php': The PHP code for render.php. Use 'get_field()' and inline editing attributes. REMEMBER THE CRITICAL ERROR PREVENTION: check `is_array()` for all complex fields.
-		- 'style_css': The CSS code for style.css.
-		- 'script_js': The JavaScript code for script.js. Follow the reference structure. Replace 'block-slug' with '$slug'.
-		- 'fields_php': The PHP code to register the ACF fields using 'acf_add_local_field_group()'. Ensure location is 'block' => 'acf/$slug' MUST start with '<?php' and end with '?>'.
-		- 'assets_php': A PHP file that hooks into 'enqueue_block_assets' to load 3rd-party libraries (Swiper, Slick, AOS, etc.) if needed. Use 'wp_register_script'/'wp_enqueue_script'. Conditionally check 'has_block( \"acf/$slug\" )'. If no 3rd party assets are needed, return empty string. MUST start with '<?php' and end with '?>'.
+		@@@FILE:plan@@@
+		1. **block.json**: Update version...
+		2. **render.php**: Add new loop...
+		@@@END_FILE@@@
 		
-		Do not include markdown formatting like ```json. Just the raw JSON string.
+		\"Now I will update the block.json...\"
+		
+		@@@FILE:block_json@@@
+		{
+		  \"name\": \"acf/example\",
+		  ...
+		}
+		@@@END_FILE@@@
+		
+		\"Finally, here is the summary...\"
+		
+		@@@FILE:summary@@@
+		- Updated block.json
+		- Fixed render.php
+		@@@END_FILE@@@
+		
+		CRITICAL RULES:
+		- Do NOT output the summary as plain text at the end. ALWAYS use @@@FILE:summary@@@.
+		- Do NOT wrap the code in markdown code blocks (like ```php). Just output the raw code between the delimiters.
+		- Do NOT output a single large JSON object. Output file by file mixed with chat.
+		- Verify complex fields (Link, Image) are arrays using !empty() && is_array().
+		- Initialize variables.
+		
+		REFERENCES:
+		1. block.json: $ref_block_json
+		2. script.js: $ref_script_js
+		
+		CONTEXT:
+		Block Title: $title
+		Block Slug: $slug
 		";
 
 		if ( ! empty( $current_code ) ) {
-			$full_prompt = "Block Title: $title\nBlock Slug: $slug\n\nCURRENT CODE CONTEXT (JSON):\n$current_code\n\nUSER MODIFICATION REQUEST:\n$user_prompt\n\nPlease update the code based on the user's request. Return the FULL updated code for all files (block_json, render_php, style_css, script_js, fields_php, assets_php), even if some are unchanged. ALSO provide a 'summary' key explaining what you changed.";
+			$full_prompt = "CURRENT CODE CONTEXT (JSON):\n$current_code\n\nUSER REQUEST:\n$user_prompt\n\nRemember: Use @@@FILE:key@@@ delimiters. DO NOT WRAP CODE in markdown ``` blocks inside the delimiters.";
 		} else {
-			$full_prompt = "Block Title: $title\nBlock Slug: $slug\nDescription: $user_prompt";
+			$full_prompt = "Description: $user_prompt\n\nRemember: Use @@@FILE:key@@@ delimiters. DO NOT WRAP CODE in markdown ``` blocks inside the delimiters.";
 		}
 
 		$contents_parts = array();
-		
-		// Add System Instruction as the first part if possible, or just prepend to user prompt?
-		// Gemini API "system_instruction" is usually a separate top-level field, but here we are using "generateContent".
-		// We can just add the system instruction as text.
-		$contents_parts[] = array( 'text' => $system_instruction . "\n\nUser Request:\n" . $full_prompt );
+		$contents_parts[] = array( 'text' => $system_instruction . "\n\n" . $full_prompt );
 
 		// Handle Image
 		if ( $image_id ) {
@@ -120,77 +151,40 @@ class ACF_Block_Builder_AI {
 		}
 
 		$body = array(
-			'contents' => array(
-				array(
-					'parts' => $contents_parts
-				)
-			),
+			'contents' => array( array( 'parts' => $contents_parts ) ),
 			'generationConfig' => array(
 				'temperature' => 0.2,
-				'responseMimeType' => 'application/json'
+				'responseMimeType' => 'text/plain'
 			)
 		);
 
-		$this->log( 'ACF Block Builder AI: Sending Request. Prompt Length: ' . strlen( $full_prompt ) );
+		// Use CURL for Streaming
+		$ch = curl_init();
+		curl_setopt( $ch, CURLOPT_URL, $url );
+		curl_setopt( $ch, CURLOPT_POST, true );
+		curl_setopt( $ch, CURLOPT_POSTFIELDS, json_encode( $body ) );
+		curl_setopt( $ch, CURLOPT_HTTPHEADER, array( 'Content-Type: application/json' ) );
+		curl_setopt( $ch, CURLOPT_RETURNTRANSFER, false ); // Important for manual stream handling
+		curl_setopt( $ch, CURLOPT_WRITEFUNCTION, function( $curl, $data ) {
+			// $data is the raw chunk from Gemini API (it might be a partial JSON structure)
+			// Gemini sends: [{"candidates": [...]}]
+            
+            // We'll wrap it in an SSE event
+            echo "data: " . base64_encode( $data ) . "\n\n";
+            
+            // Flush buffer to force send to client
+            if ( ob_get_level() > 0 ) ob_flush();
+            flush();
+            
+			return strlen( $data );
+		} );
 
-		$response = wp_remote_post( $url, array(
-			'body'    => json_encode( $body ),
-			'headers' => array( 'Content-Type' => 'application/json' ),
-			'timeout' => 240, // Increased timeout to 120 seconds
-		));
-
-		if ( is_wp_error( $response ) ) {
-			$this->log( 'ACF Block Builder AI Error: ' . $response->get_error_message() );
-			return $response;
-		}
-
-		$response_code = wp_remote_retrieve_response_code( $response );
-		if ( $response_code !== 200 ) {
-			$body = wp_remote_retrieve_body( $response );
-			$this->log( 'ACF Block Builder AI API Error (' . $response_code . '): ' . $body );
-			return new WP_Error( 'api_error', 'Gemini API Error: ' . $response_code . ' - ' . $body );
-		}
-
-		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body, true );
-
-		// Check for safety ratings or finish reason
-		if ( isset( $data['candidates'][0]['finishReason'] ) && $data['candidates'][0]['finishReason'] !== 'STOP' ) {
-			$reason = $data['candidates'][0]['finishReason'];
-			$this->log( 'ACF Block Builder AI Finish Reason: ' . $reason );
-			return new WP_Error( 'api_error', 'AI Generation stopped. Reason: ' . $reason );
-		}
-
-		if ( empty( $data['candidates'][0]['content']['parts'][0]['text'] ) ) {
-			$this->log( 'ACF Block Builder AI Empty Response: ' . print_r( $data, true ) );
-			return new WP_Error( 'api_error', 'Invalid response from API. Check server logs for details.' );
-		}
-
-		$text = $data['candidates'][0]['content']['parts'][0]['text'];
-
-		// Debug: Log the raw response
-		$this->log( 'ACF Block Builder AI Raw Response: ' . $text );
-		
-		// Attempt to parse the JSON
-		$json_data = json_decode( $text, true );
-		if ( json_last_error() !== JSON_ERROR_NONE ) {
-			// Include a snippet of the response in the error for easier debugging
-			$snippet = substr( $text, 0, 500 );
-			return new WP_Error( 'json_error', 'Failed to parse AI response as JSON: ' . json_last_error_msg() . '. Raw Response Snippet: ' . $snippet );
-		}
-
-		// Ensure PHP files have opening tags
-		if ( ! empty( $json_data['render_php'] ) && strpos( trim( $json_data['render_php'] ), '<?php' ) !== 0 ) {
-			$json_data['render_php'] = "<?php\n" . $json_data['render_php'];
-		}
-		if ( ! empty( $json_data['fields_php'] ) && strpos( trim( $json_data['fields_php'] ), '<?php' ) !== 0 ) {
-			$json_data['fields_php'] = "<?php\n" . $json_data['fields_php'];
-		}
-		if ( ! empty( $json_data['assets_php'] ) && strpos( trim( $json_data['assets_php'] ), '<?php' ) !== 0 ) {
-			$json_data['assets_php'] = "<?php\n" . $json_data['assets_php'];
-		}
-
-		return $json_data;
+		curl_exec( $ch );
+		curl_close( $ch );
+        
+        // End stream
+        echo "data: [DONE]\n\n";
+        flush();
 	}
 }
 
