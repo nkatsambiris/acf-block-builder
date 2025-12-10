@@ -11,6 +11,9 @@ A WordPress plugin that allows you to create and manage ACF Blocks using AI and 
 3. Enter your API key and configure your settings
 4. Start generating new ACF Blocks
 
+## Version 1.0.6 Changes
+- Updates to styling on settings screen
+
 ## Version 1.0.5 Changes
 - Updates to styling on edit block screen
 - AI summary given in chat window

@@ -5,14 +5,36 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class ACF_Block_Builder_Settings {
 
+	private $settings_page_hook;
+
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'wp_ajax_acf_block_builder_add_theme_loader', array( $this, 'handle_add_theme_loader' ) );
 	}
 
+	public function enqueue_assets( $hook ) {
+		// Use the stored hook suffix if available, otherwise fallback or check generically
+		if ( $this->settings_page_hook && $hook !== $this->settings_page_hook ) {
+			return;
+		}
+
+		// Fallback check if property isn't set for some reason (e.g. strict order issues, though admin_menu is before admin_enqueue_scripts)
+		if ( ! $this->settings_page_hook && 'acf-block_page_acf-block-builder-settings' !== $hook ) {
+			return;
+		}
+
+		wp_enqueue_style( 
+			'acf-block-builder-settings', 
+			ACF_BLOCK_BUILDER_URL . 'assets/css/admin-settings.css', 
+			array(), 
+			ACF_BLOCK_BUILDER_VERSION 
+		);
+	}
+
 	public function add_settings_page() {
-		add_submenu_page(
+		$this->settings_page_hook = add_submenu_page(
 			'edit.php?post_type=acf_block_builder',
 			__( 'Settings', 'acf-block-builder' ),
 			__( 'Settings', 'acf-block-builder' ),
@@ -29,61 +51,98 @@ class ACF_Block_Builder_Settings {
 
 	public function render_settings_page() {
 		?>
-		<div class="wrap">
-			<h1><?php echo esc_html__( 'ACF Block Builder Settings', 'acf-block-builder' ); ?></h1>
-			<form method="post" action="options.php">
+		<div class="acf-bb-header-bar">
+			<div class="acf-bb-header-inner">
+				<div class="acf-bb-header-label">Settings</div>
+				<div class="acf-block-builder-actions">
+					<?php submit_button( __( 'Save Changes', 'acf-block-builder' ), 'button button-primary button-large', 'submit', false, array( 'form' => 'acf-block-builder-settings-form' ) ); ?>
+				</div>
+			</div>
+		</div>
+		<div class="wrap acf-block-builder-settings-wrap">
+			<div class="acf-block-builder-header">
+				<h1><?php echo esc_html__( 'ACF Block Builder Settings', 'acf-block-builder' ); ?></h1>
+			</div>
+			
+			<form id="acf-block-builder-settings-form" method="post" action="options.php">
 				<?php
 				settings_fields( 'acf_block_builder_settings' );
 				do_settings_sections( 'acf_block_builder_settings' );
 				?>
-				<table class="form-table">
-					<tr valign="top">
-						<th scope="row"><?php echo esc_html__( 'Gemini API Key', 'acf-block-builder' ); ?></th>
-						<td>
-							<input type="password" name="acf_block_builder_gemini_api_key" value="<?php echo esc_attr( get_option( 'acf_block_builder_gemini_api_key' ) ); ?>" class="regular-text" />
-							<p class="description">
-								<?php echo wp_kses_post( __( 'Enter your Gemini API Key. You can get one from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.', 'acf-block-builder' ) ); ?>
-							</p>
-						</td>
-					</tr>
-					<tr valign="top">
-						<th scope="row"><?php echo esc_html__( 'Debug Mode', 'acf-block-builder' ); ?></th>
-						<td>
-							<input type="checkbox" name="acf_block_builder_debug_enabled" value="1" <?php checked( 1, get_option( 'acf_block_builder_debug_enabled' ), true ); ?> />
-							<p class="description">
-								<?php echo esc_html__( 'Enable debug logging for the plugin updater.', 'acf-block-builder' ); ?>
-							</p>
-						</td>
-					</tr>
-				</table>
-				
-				<hr>
-				
-				<h2><?php esc_html_e( 'Theme Integration', 'acf-block-builder' ); ?></h2>
-				<table class="form-table">
-					<tr valign="top">
-						<th scope="row"><?php esc_html_e( 'Theme Loader', 'acf-block-builder' ); ?></th>
-						<td>
-							<?php if ( $this->is_theme_loader_installed() ) : ?>
-								<div class="notice notice-success inline" style="margin: 0;">
-									<p>
-										<span class="dashicons dashicons-yes-alt" style="color: green;"></span>
-										<?php esc_html_e( 'Theme loader is installed. Blocks in your theme\'s "blocks" directory will be automatically loaded.', 'acf-block-builder' ); ?>
+
+				<div class="acf-block-builder-grid">
+					<div class="acf-block-builder-main">
+						
+						<!-- General Settings Card -->
+						<div class="acf-block-builder-card">
+							<div class="acf-block-builder-card-header">
+								<h2><?php esc_html_e( 'General Settings', 'acf-block-builder' ); ?></h2>
+							</div>
+							<div class="acf-block-builder-card-body">
+								
+								<div class="acf-block-builder-field-group">
+									<label class="acf-block-builder-field-label" for="acf_block_builder_gemini_api_key"><?php esc_html_e( 'Gemini API Key', 'acf-block-builder' ); ?></label>
+									<div class="acf-block-builder-input-wrapper">
+										<input type="password" id="acf_block_builder_gemini_api_key" name="acf_block_builder_gemini_api_key" value="<?php echo esc_attr( get_option( 'acf_block_builder_gemini_api_key' ) ); ?>" />
+									</div>
+									<p class="acf-block-builder-description">
+										<?php echo wp_kses_post( __( 'Enter your Gemini API Key. You can get one from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.', 'acf-block-builder' ) ); ?>
 									</p>
 								</div>
-							<?php else : ?>
-								<button type="button" id="acf-block-builder-add-theme-loader" class="button button-secondary">
-									<?php esc_html_e( 'Install Theme Loader', 'acf-block-builder' ); ?>
-								</button>
-								<p class="description">
-									<?php esc_html_e( 'Add code to your active theme\'s functions.php to automatically load blocks from the "blocks" directory.', 'acf-block-builder' ); ?>
-								</p>
-							<?php endif; ?>
-						</td>
-					</tr>
-				</table>
 
-				<?php submit_button(); ?>
+
+							</div>
+						</div>
+
+						<!-- Theme Integration Card -->
+						<div class="acf-block-builder-card">
+							<div class="acf-block-builder-card-header">
+								<h2><?php esc_html_e( 'Theme Integration', 'acf-block-builder' ); ?></h2>
+							</div>
+							<div class="acf-block-builder-card-body">
+								<div class="acf-block-builder-field-group">
+									<label class="acf-block-builder-field-label"><?php esc_html_e( 'Theme Loader', 'acf-block-builder' ); ?></label>
+									
+									<?php if ( $this->is_theme_loader_installed() ) : ?>
+										<div class="acf-block-builder-status-badge acf-block-builder-status-success">
+											<span class="dashicons dashicons-yes-alt" style="font-size: 16px; width: 16px; height: 16px; margin-right: 4px;"></span>
+											<?php esc_html_e( 'Installed', 'acf-block-builder' ); ?>
+										</div>
+										<p class="acf-block-builder-description">
+											<?php esc_html_e( 'Theme loader is active. Blocks in your theme\'s "blocks" directory will be automatically loaded.', 'acf-block-builder' ); ?>
+										</p>
+									<?php else : ?>
+										<button type="button" id="acf-block-builder-add-theme-loader" class="button button-secondary">
+											<?php esc_html_e( 'Install Theme Loader', 'acf-block-builder' ); ?>
+										</button>
+										<p class="acf-block-builder-description">
+											<?php esc_html_e( 'Add code to your active theme\'s functions.php to automatically load blocks from the "blocks" directory.', 'acf-block-builder' ); ?>
+										</p>
+									<?php endif; ?>
+								</div>
+							</div>
+						</div>
+
+						<!-- General Settings Card -->
+						<div class="acf-block-builder-card">
+							<div class="acf-block-builder-card-header">
+								<h2><?php esc_html_e( 'Debugging', 'acf-block-builder' ); ?></h2>
+							</div>
+							<div class="acf-block-builder-card-body">
+					
+
+								<div class="acf-block-builder-field-group">
+									<label class="acf-block-builder-field-label">
+										<input type="checkbox" name="acf_block_builder_debug_enabled" value="1" <?php checked( 1, get_option( 'acf_block_builder_debug_enabled' ), true ); ?> />
+										<?php esc_html_e( 'Enable Debug Mode', 'acf-block-builder' ); ?>
+									</label>
+								</div>
+
+							</div>
+						</div>
+					</div>
+				</div>
+
 			</form>
 
 			<script type="text/javascript">
@@ -96,6 +155,7 @@ class ACF_Block_Builder_Settings {
 
 					var $btn = $(this);
 					$btn.prop('disabled', true);
+					$btn.text('<?php echo esc_js( __( 'Installing...', 'acf-block-builder' ) ); ?>');
 
 					$.ajax({
 						url: ajaxurl,
@@ -106,16 +166,17 @@ class ACF_Block_Builder_Settings {
 						},
 						success: function(response) {
 							if (response.success) {
-								alert(response.data);
 								location.reload();
 							} else {
 								alert('Error: ' + response.data);
 								$btn.prop('disabled', false);
+								$btn.text('<?php echo esc_js( __( 'Install Theme Loader', 'acf-block-builder' ) ); ?>');
 							}
 						},
 						error: function() {
 							alert('System Error');
 							$btn.prop('disabled', false);
+							$btn.text('<?php echo esc_js( __( 'Install Theme Loader', 'acf-block-builder' ) ); ?>');
 						}
 					});
 				});
@@ -199,7 +260,7 @@ PHP;
 			wp_send_json_error( 'Failed to write to functions.php.' );
 		}
 
-		wp_send_json_success( 'Loader code added to functions.php successfully.' );
+		wp_send_json_success( 'ACF Block Builder code has been added to functions.php successfully.' );
 	}
 }
 

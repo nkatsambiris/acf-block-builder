@@ -1,0 +1,165 @@
+.acf-block-builder-settings-wrap {
+    max_width: 1200px;
+    margin: 20px 20px 0 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+.acf-block-builder-header {
+    margin-bottom: 20px;
+}
+
+.acf-block-builder-header h1 {
+    font-size: 24px;
+    font-weight: 600;
+    color: #1d2327;
+    margin: 0;
+}
+
+.acf-block-builder-card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px; /* Standard WP admin border radius is usually small, but let's go with 4px or 6px for modern look */
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    margin-bottom: 20px;
+    padding: 0;
+    overflow: hidden;
+}
+
+.acf-block-builder-card-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #f0f0f1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.acf-block-builder-card-header h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+    color: #1d2327;
+}
+
+.acf-block-builder-card-body {
+    padding: 20px;
+}
+
+.acf-block-builder-field-group {
+    margin-bottom: 20px;
+}
+
+.acf-block-builder-field-group:last-child {
+    margin-bottom: 0;
+}
+
+.acf-block-builder-field-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #1d2327;
+}
+
+.acf-block-builder-input-wrapper {
+    max-width: 600px;
+}
+
+.acf-block-builder-settings-wrap input[type="text"],
+.acf-block-builder-settings-wrap input[type="password"],
+.acf-block-builder-settings-wrap textarea,
+.acf-block-builder-settings-wrap select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.acf-block-builder-settings-wrap input[type="checkbox"] {
+    margin-top: 2px;
+}
+
+.acf-block-builder-description {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #646970;
+    font-style: normal;
+}
+
+.acf-block-builder-status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.acf-block-builder-status-success {
+    background-color: #edfaef;
+    color: #00a32a;
+}
+
+.acf-block-builder-status-error {
+    background-color: #fce8e2;
+    color: #d93025;
+}
+
+/* Flex layout for side-by-side cards if needed */
+.acf-block-builder-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+
+@media (min-width: 782px) {
+    .acf-block-builder-grid {
+        grid-template-columns: 2fr 1fr; /* Main settings vs sidebar/info */
+    }
+}
+
+
+.acf-bb-header-bar {
+    background: #fff;
+    border-bottom: 1px solid #e2e4e7;
+    margin: 0px 0px 0px -22px;
+    padding: 10px 20px;
+    position: sticky;
+    top: 32px; /* Height of wpadminbar usually */
+    z-index: 99;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.acf-bb-header-inner {
+    display: flex;
+    align-items: center;
+    margin: 0 auto;
+    gap: 20px;
+    justify-content: space-between;
+}
+
+.acf-bb-header-label {
+    font-size: 20px;
+    font-weight: 500;
+    color: #1d2327;
+    white-space: nowrap;
+}
+
+.acf-bb-title-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.acf-bb-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.acf-block-builder-actions .button.button-large {
+    min-height: 40px;
+    line-height: 38px;
+    padding: 0 20px;
+    font-size: 14px;
+}

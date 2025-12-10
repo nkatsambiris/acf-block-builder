@@ -484,9 +484,8 @@
 .acf-bb-header-inner {
     display: flex;
     align-items: center;
-    max-width: 1440px;
-    margin: 0 auto;
     gap: 20px;
+    justify-content: space-between;
 }
 
 .acf-bb-header-label {
@@ -547,11 +546,6 @@
     line-height: 38px;
     padding: 0 20px;
     font-size: 14px;
-}
-
-/* Clean up standard WP elements when enhanced UI is active */
-.acf-bb-enhanced-ui #screen-meta-links {
-    display: none;
 }
 
 .post-type-acf_block_builder #post-body-content #acf_after_title-sortables {
