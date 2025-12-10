@@ -2,7 +2,7 @@
 /**
 * Plugin Name: ACF Block Builder
 * Description: A tool to easily create and manage ACF Blocks using AI and an internal code editor.
-* Version: 1.0.2
+* Version: 1.0.3
 * Author: Nicholas Katsambiris
 * Update URI: acf-block-builder
 * License: MIT
@@ -31,7 +31,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'ACF_BLOCK_BUILDER_PATH', plugin_dir_path( __FILE__ ) );
 define( 'ACF_BLOCK_BUILDER_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACF_BLOCK_BUILDER_FILE', __FILE__ );
-define( 'ACF_BLOCK_BUILDER_VERSION', '1.0.2' );
+define( 'ACF_BLOCK_BUILDER_VERSION', '1.0.3' );
 
 class ACF_Block_Builder {
 
@@ -313,4 +313,49 @@ class ACF_Block_Builder {
 	}
 }
 
-new ACF_Block_Builder();
+function acf_block_builder_init() {
+	// Check if ACF is active
+	if ( ! class_exists( 'ACF' ) ) {
+		add_action( 'admin_notices', 'acf_block_builder_notice_missing_acf' );
+		return;
+	}
+
+	// Check if ACF PRO is active
+	if ( ! defined( 'ACF_PRO' ) || ! ACF_PRO ) {
+		add_action( 'admin_notices', 'acf_block_builder_notice_missing_pro' );
+		return;
+	}
+
+	// Check ACF Version
+	if ( defined( 'ACF_VERSION' ) && version_compare( ACF_VERSION, '6.7.0', '<' ) ) {
+		add_action( 'admin_notices', 'acf_block_builder_notice_version' );
+		return;
+	}
+
+	new ACF_Block_Builder();
+}
+add_action( 'plugins_loaded', 'acf_block_builder_init' );
+
+function acf_block_builder_notice_missing_acf() {
+	?>
+	<div class="notice notice-error is-dismissible">
+		<p><?php _e( 'ACF Block Builder requires Advanced Custom Fields PRO to be installed and active.', 'acf-block-builder' ); ?></p>
+	</div>
+	<?php
+}
+
+function acf_block_builder_notice_missing_pro() {
+	?>
+	<div class="notice notice-error is-dismissible">
+		<p><?php _e( 'ACF Block Builder requires Advanced Custom Fields PRO. You are currently using the free version.', 'acf-block-builder' ); ?></p>
+	</div>
+	<?php
+}
+
+function acf_block_builder_notice_version() {
+	?>
+	<div class="notice notice-error is-dismissible">
+		<p><?php _e( 'ACF Block Builder requires Advanced Custom Fields PRO version 6.7.0 or greater.', 'acf-block-builder' ); ?></p>
+	</div>
+	<?php
+}
