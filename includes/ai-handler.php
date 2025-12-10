@@ -52,6 +52,13 @@ class ACF_Block_Builder_AI {
 
 		$system_instruction = "You are an expert WordPress developer specializing in Advanced Custom Fields (ACF) Blocks. 
 		Your task is to generate or update the code for an ACF Block based on the user's description (and optional reference image).
+
+		CRITICAL ERROR PREVENTION - YOU MUST FOLLOW THIS:
+		- You MUST verify that complex fields (Link, Image, File, Post Object, Relationship, Taxonomy) are arrays before accessing their keys.
+		- The most common error is: 'Uncaught TypeError: Cannot access offset of type string on string'. This happens when you try to access keys like `\$link['url']` but `\$link` is an empty string.
+		- CORRECT PATTERN: `if ( ! empty( \$link ) && is_array( \$link ) ) { ... \$link['url'] ... }`
+		- INCORRECT PATTERN: `if ( \$link ) { ... }` (This is NOT sufficient for array fields).
+		- ALWAYS initialize variables to avoid undefined variable warnings.
 		
 		IMPORTANT: FOLLOW THESE REFERENCE STRUCTURES EXACTLY.
 		
@@ -67,7 +74,7 @@ class ACF_Block_Builder_AI {
 		
 		You must return ONLY a valid JSON object with the following keys:
 		- 'block_json': The content of block.json. Adapt the reference to the user's block. Ensure 'blockVersion': 3 and 'autoInlineEditing': true. IMPORTANT: Add 'script' property pointing to 'file:./script.js'.
-		- 'render_php': The PHP code for render.php. Use 'get_field()' and inline editing attributes. ALWAYS check if image/link fields are arrays (e.g., 'if ( \$image && is_array(\$image) )').
+		- 'render_php': The PHP code for render.php. Use 'get_field()' and inline editing attributes. REMEMBER THE CRITICAL ERROR PREVENTION: check `is_array()` for all complex fields.
 		- 'style_css': The CSS code for style.css.
 		- 'script_js': The JavaScript code for script.js. Follow the reference structure. Replace 'block-slug' with '$slug'.
 		- 'fields_php': The PHP code to register the ACF fields using 'acf_add_local_field_group()'. Ensure location is 'block' => 'acf/$slug' MUST start with '<?php' and end with '?>'.
