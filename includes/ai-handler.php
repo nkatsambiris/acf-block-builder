@@ -41,6 +41,12 @@ class ACF_Block_Builder_AI {
 		wp_send_json_success( $generated_code );
 	}
 
+	private function log( $message ) {
+		if ( get_option( 'acf_block_builder_debug_enabled' ) ) {
+			error_log( $message );
+		}
+	}
+
 	private function call_gemini_api( $api_key, $user_prompt, $title, $image_id = 0, $current_code = '' ) {
 		$url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=' . $api_key;
 
@@ -124,6 +130,8 @@ class ACF_Block_Builder_AI {
 			)
 		);
 
+		$this->log( 'ACF Block Builder AI: Sending Request. Prompt Length: ' . strlen( $full_prompt ) );
+
 		$response = wp_remote_post( $url, array(
 			'body'    => json_encode( $body ),
 			'headers' => array( 'Content-Type' => 'application/json' ),
@@ -131,14 +139,14 @@ class ACF_Block_Builder_AI {
 		));
 
 		if ( is_wp_error( $response ) ) {
-			error_log( 'ACF Block Builder AI Error: ' . $response->get_error_message() );
+			$this->log( 'ACF Block Builder AI Error: ' . $response->get_error_message() );
 			return $response;
 		}
 
 		$response_code = wp_remote_retrieve_response_code( $response );
 		if ( $response_code !== 200 ) {
 			$body = wp_remote_retrieve_body( $response );
-			error_log( 'ACF Block Builder AI API Error (' . $response_code . '): ' . $body );
+			$this->log( 'ACF Block Builder AI API Error (' . $response_code . '): ' . $body );
 			return new WP_Error( 'api_error', 'Gemini API Error: ' . $response_code . ' - ' . $body );
 		}
 
@@ -148,21 +156,26 @@ class ACF_Block_Builder_AI {
 		// Check for safety ratings or finish reason
 		if ( isset( $data['candidates'][0]['finishReason'] ) && $data['candidates'][0]['finishReason'] !== 'STOP' ) {
 			$reason = $data['candidates'][0]['finishReason'];
-			error_log( 'ACF Block Builder AI Finish Reason: ' . $reason );
+			$this->log( 'ACF Block Builder AI Finish Reason: ' . $reason );
 			return new WP_Error( 'api_error', 'AI Generation stopped. Reason: ' . $reason );
 		}
 
 		if ( empty( $data['candidates'][0]['content']['parts'][0]['text'] ) ) {
-			error_log( 'ACF Block Builder AI Empty Response: ' . print_r( $data, true ) );
+			$this->log( 'ACF Block Builder AI Empty Response: ' . print_r( $data, true ) );
 			return new WP_Error( 'api_error', 'Invalid response from API. Check server logs for details.' );
 		}
 
 		$text = $data['candidates'][0]['content']['parts'][0]['text'];
+
+		// Debug: Log the raw response
+		$this->log( 'ACF Block Builder AI Raw Response: ' . $text );
 		
 		// Attempt to parse the JSON
 		$json_data = json_decode( $text, true );
 		if ( json_last_error() !== JSON_ERROR_NONE ) {
-			return new WP_Error( 'json_error', 'Failed to parse AI response as JSON: ' . json_last_error_msg() );
+			// Include a snippet of the response in the error for easier debugging
+			$snippet = substr( $text, 0, 500 );
+			return new WP_Error( 'json_error', 'Failed to parse AI response as JSON: ' . json_last_error_msg() . '. Raw Response Snippet: ' . $snippet );
 		}
 
 		// Ensure PHP files have opening tags
