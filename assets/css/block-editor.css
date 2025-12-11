@@ -68,6 +68,18 @@
     min-width: 0; 
 }
 
+.acf-bb-message-content p {
+    margin: 0 0 8px 0;
+}
+
+.acf-bb-message-content p:last-child {
+    margin-bottom: 0;
+}
+
+.acf-bb-message-content > br {
+    display: none; /* Hide stray br tags */
+}
+
 .acf-bb-typing::after {
     content: '...';
     animation: acf-bb-dots 1.5s steps(4, end) infinite;
@@ -398,7 +410,7 @@
 
 /* Highlight changed tabs */
 .acf-bb-tab.has-changes {
-    color: #d63638; /* Red/Orange to indicate change */
+    color: #d63638;
 }
 
 .acf-bb-tab.has-changes::after {
@@ -408,10 +420,176 @@
     font-size: 16px;
 }
 
+/* File acceptance status on tabs */
+.acf-bb-tab-status {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+}
+
+.acf-bb-tab-status .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
+.acf-bb-tab.file-accepted {
+    color: #00a32a !important;
+    background: rgba(0, 163, 42, 0.08);
+}
+
+.acf-bb-tab.file-accepted .acf-bb-tab-status .dashicons {
+    color: #00a32a;
+}
+
+.acf-bb-tab.file-accepted::after {
+    display: none;
+}
+
+.acf-bb-tab.file-rejected {
+    color: #787c82 !important;
+    background: rgba(120, 124, 130, 0.08);
+    text-decoration: line-through;
+}
+
+.acf-bb-tab.file-rejected .acf-bb-tab-status .dashicons {
+    color: #d63638;
+}
+
+.acf-bb-tab.file-rejected::after {
+    display: none;
+}
+
+/* Diff Toolbar */
+.acf-bb-diff-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 15px;
+    background: #1e1e1e;
+    border-bottom: 1px solid #333;
+    gap: 20px;
+}
+
+.acf-bb-diff-file-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.acf-bb-diff-file-actions .acf-bb-file-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 14px;
+    font-size: 13px;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+}
+
+.acf-bb-diff-file-actions .acf-bb-file-btn .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+#acf-bb-file-reject {
+    background: #f0f0f1;
+    border-color: #8c8f94;
+    color: #50575e;
+}
+
+#acf-bb-file-reject:hover {
+    background: #fef0f0;
+    border-color: #d63638;
+    color: #d63638;
+}
+
+#acf-bb-file-reject.active {
+    background: #d63638;
+    border-color: #d63638;
+    color: #fff;
+}
+
+#acf-bb-file-accept {
+    background: #2271b1;
+    border-color: #2271b1;
+    color: #fff;
+}
+
+#acf-bb-file-accept:hover {
+    background: #135e96;
+    border-color: #135e96;
+}
+
+#acf-bb-file-accept.active {
+    background: #00a32a;
+    border-color: #00a32a;
+    color: #fff;
+}
+
+/* Diff Navigation */
+.acf-bb-diff-nav,
+.acf-bb-diff-file-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.acf-bb-diff-nav button,
+.acf-bb-diff-file-nav button {
+    padding: 4px 8px;
+    min-width: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #2d2d2d;
+    border: 1px solid #404040;
+    color: #ccc;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.acf-bb-diff-nav button:hover:not(:disabled),
+.acf-bb-diff-file-nav button:hover:not(:disabled) {
+    background: #3d3d3d;
+    border-color: #555;
+    color: #fff;
+}
+
+.acf-bb-diff-nav button:disabled,
+.acf-bb-diff-file-nav button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.acf-bb-diff-nav button .dashicons,
+.acf-bb-diff-file-nav button .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.acf-bb-diff-counter,
+.acf-bb-file-counter {
+    font-size: 12px;
+    color: #aaa;
+    font-family: 'Monaco', 'Consolas', monospace;
+    min-width: 60px;
+    text-align: center;
+    white-space: nowrap;
+}
+
 #acf-bb-diff-editor-container {
     flex: 1;
     width: 100%;
     border: none;
+}
+
+/* Diff content area styling */
+.acf-bb-diff-content {
+    max-width: 95% !important;
+    width: 95% !important;
 }
 
 #acf_block_builder_editor,
@@ -652,6 +830,26 @@
     word-wrap: break-word; /* Ensure long lines break */
 }
 
+/* Chat Monaco Editor Container */
+.acf-bb-chat-monaco-container {
+    padding: 0;
+    padding-left: 8px;
+    min-height: 80px;
+    max-height: 400px;
+    overflow: hidden;
+    background: #1e1e1e;
+}
+
+
+.acf-bb-chat-monaco-container .monaco-editor {
+    border-radius: 0 0 4px 4px;
+}
+
+/* Ensure Monaco editors in chat have proper sizing */
+.acf-bb-code-widget .acf-bb-chat-monaco-container {
+    width: 100%;
+}
+
 /* Summary Widget */
 .acf-bb-summary-widget {
     margin-top: 15px;
@@ -707,5 +905,430 @@
 }
 
 .acf-bb-plan-content div {
+    margin-bottom: 4px;
+}
+
+.acf-bb-plan-content div:last-child {
+    margin-bottom: 0;
+}
+
+.acf-bb-plan-item {
+    padding-left: 8px;
+}
+
+/* ==========================================
+   VERSION HISTORY STYLES
+   ========================================== */
+
+/* History Button in Tab Bar */
+.acf-bb-history-btn {
+    margin-left: auto;
+    padding: 8px 12px;
+    background: transparent;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #50575e;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.acf-bb-history-btn:hover {
+    background: #f0f0f1;
+    border-color: #2271b1;
+    color: #2271b1;
+}
+
+.acf-bb-history-btn .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+/* Version Overlay Content */
+.acf-bb-version-content {
+    max-width: 95% !important;
+    width: 95% !important;
+    height: 90vh;
+    padding: 0 !important;
+    display: flex;
+    flex-direction: column;
+    text-align: left !important;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.acf-bb-version-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #e2e4e7;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8f9fa;
+}
+
+.acf-bb-version-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #1d2327;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.acf-bb-version-header h3 .dashicons {
+    color: #2271b1;
+}
+
+.acf-bb-close-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #787c82;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.acf-bb-close-btn:hover {
+    color: #d63638;
+}
+
+/* Version Layout - Sidebar + Main */
+.acf-bb-version-layout {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Version Sidebar */
+.acf-bb-version-sidebar {
+    width: 320px;
+    border-right: 1px solid #e2e4e7;
+    display: flex;
+    flex-direction: column;
+    background: #f8f9fa;
+}
+
+/* File Type Tabs (Vertical) */
+.acf-bb-version-file-tabs {
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    gap: 4px;
+    border-bottom: 1px solid #e2e4e7;
+    background: #fff;
+}
+
+.acf-bb-version-file-tab {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #50575e;
+    transition: all 0.15s ease;
+    text-align: left;
+}
+
+.acf-bb-version-file-tab:hover {
+    background: #f0f0f1;
+    color: #1d2327;
+}
+
+.acf-bb-version-file-tab.active {
+    background: #2271b1;
+    color: #fff;
+    border-color: #2271b1;
+}
+
+.acf-bb-version-file-tab .file-name {
+    font-weight: 500;
+}
+
+.acf-bb-version-file-tab .version-count {
+    background: rgba(0, 0, 0, 0.1);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.acf-bb-version-file-tab.active .version-count {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Version List Container */
+.acf-bb-version-list-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.acf-bb-version-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Version Item */
+.acf-bb-version-item {
+    background: #fff;
+    border: 1px solid #e2e4e7;
+    border-radius: 6px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.acf-bb-version-item:hover {
+    border-color: #2271b1;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.acf-bb-version-item.selected {
+    border-color: #2271b1;
+    background: #f0f7fc;
+}
+
+.acf-bb-version-item.is-latest {
+    border-color: #00a32a;
+}
+
+.acf-bb-version-item-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.acf-bb-version-number {
+    font-weight: 600;
+    font-size: 14px;
+    color: #1d2327;
+}
+
+.acf-bb-version-badge {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: #00a32a;
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.acf-bb-version-item-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: #646970;
     margin-bottom: 8px;
+}
+
+.acf-bb-version-item-meta .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+.acf-bb-version-author,
+.acf-bb-version-date {
+    display: flex;
+    align-items: center;
+}
+
+.acf-bb-version-item-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.acf-bb-version-item-actions .button {
+    font-size: 11px;
+    padding: 2px 8px;
+    min-height: 24px;
+    line-height: 22px;
+}
+
+/* Version Main Area */
+.acf-bb-version-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: #1e1e1e;
+}
+
+/* Version Toolbar */
+.acf-bb-version-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #2d2d2d;
+    border-bottom: 1px solid #404040;
+    gap: 16px;
+}
+
+.acf-bb-version-compare-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.acf-bb-compare-label {
+    color: #aaa;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.acf-bb-compare-arrow {
+    color: #666;
+    font-size: 16px;
+}
+
+.acf-bb-version-select {
+    padding: 6px 10px;
+    border: 1px solid #404040;
+    border-radius: 4px;
+    background: #1e1e1e;
+    color: #ccc;
+    font-size: 12px;
+    min-width: 180px;
+}
+
+.acf-bb-version-select:focus {
+    border-color: #2271b1;
+    outline: none;
+}
+
+.acf-bb-version-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.acf-bb-version-actions .button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.acf-bb-version-actions .button .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+/* Diff Container */
+.acf-bb-version-diff-container {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+}
+
+.acf-bb-version-diff-container .monaco-editor {
+    position: absolute !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+/* Placeholder State */
+.acf-bb-version-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #666;
+    text-align: center;
+    padding: 40px;
+}
+
+.acf-bb-version-placeholder .dashicons {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.acf-bb-version-placeholder p {
+    margin: 0;
+    font-size: 14px;
+}
+
+/* Loading State */
+.acf-bb-version-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 40px;
+    color: #666;
+}
+
+.acf-bb-version-loading .spinner {
+    float: none;
+    margin: 0;
+}
+
+/* Empty State */
+.acf-bb-version-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+    font-size: 13px;
+}
+
+/* Error State */
+.acf-bb-version-error {
+    text-align: center;
+    padding: 40px 20px;
+    color: #d63638;
+    font-size: 13px;
+}
+
+/* Responsive adjustments for version overlay */
+@media (max-width: 1200px) {
+    .acf-bb-version-sidebar {
+        width: 280px;
+    }
+}
+
+@media (max-width: 900px) {
+    .acf-bb-version-layout {
+        flex-direction: column;
+    }
+    
+    .acf-bb-version-sidebar {
+        width: 100%;
+        max-height: 40%;
+        border-right: none;
+        border-bottom: 1px solid #e2e4e7;
+    }
+    
+    .acf-bb-version-file-tabs {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    
+    .acf-bb-version-file-tab {
+        flex: 1 1 auto;
+        min-width: 100px;
+    }
 }

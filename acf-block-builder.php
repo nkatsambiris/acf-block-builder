@@ -2,7 +2,7 @@
 /**
 * Plugin Name: ACF Block Builder
 * Description: A tool to easily create and manage ACF Blocks using AI and an internal code editor.
-* Version: 1.1.0
+* Version: 1.2.0
 * Author: Nicholas Katsambiris
 * Update URI: acf-block-builder
 * License: MIT
@@ -31,7 +31,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'ACF_BLOCK_BUILDER_PATH', plugin_dir_path( __FILE__ ) );
 define( 'ACF_BLOCK_BUILDER_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACF_BLOCK_BUILDER_FILE', __FILE__ );
-define( 'ACF_BLOCK_BUILDER_VERSION', '1.1.0' );
+define( 'ACF_BLOCK_BUILDER_VERSION', '1.2.0' );
 
 class ACF_Block_Builder {
 
@@ -51,6 +51,8 @@ class ACF_Block_Builder {
 		require_once ACF_BLOCK_BUILDER_PATH . 'includes/meta-boxes.php';
 		// Load Revisions Handler
 		require_once ACF_BLOCK_BUILDER_PATH . 'includes/revisions-handler.php';
+		// Load File Versions Handler (per-file version control)
+		require_once ACF_BLOCK_BUILDER_PATH . 'includes/file-versions.php';
 		// Load AI Handler
 		require_once ACF_BLOCK_BUILDER_PATH . 'includes/ai-handler.php';
 
@@ -358,4 +360,17 @@ function acf_block_builder_notice_version() {
 		<p><?php _e( 'ACF Block Builder requires Advanced Custom Fields PRO version 6.7.0 or greater.', 'acf-block-builder' ); ?></p>
 	</div>
 	<?php
+}
+
+// Plugin activation hook - create file versions table
+register_activation_hook( ACF_BLOCK_BUILDER_FILE, 'acf_block_builder_activate' );
+function acf_block_builder_activate() {
+	// Create file versions database table
+	if ( function_exists( 'acf_block_builder_activate_file_versions' ) ) {
+		acf_block_builder_activate_file_versions();
+	} else {
+		// Include the file if not already loaded
+		require_once plugin_dir_path( ACF_BLOCK_BUILDER_FILE ) . 'includes/file-versions.php';
+		ACF_Block_Builder_File_Versions::create_table();
+	}
 }

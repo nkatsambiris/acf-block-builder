@@ -220,6 +220,15 @@ class ACF_Block_Builder_Meta_Boxes {
 				<p class="description" style="margin-top: 10px;">
 					<?php _e( 'Copy block files directly to the active theme\'s "blocks" directory.', 'acf-block-builder' ); ?>
 				</p>
+				
+				<hr style="margin: 20px 0; border: 0; border-top: 1px solid #dcdcde;" />
+				
+				<button type="button" id="acf-bb-clear-history" class="button button-secondary button-large" style="width: 100%; justify-content: center; display: flex; align-items: center; gap: 5px; color: #b32d2e;">
+					<span class="dashicons dashicons-trash"></span> <?php _e( 'Clear Chat History', 'acf-block-builder' ); ?>
+				</button>
+				<p class="description" style="margin-top: 10px;">
+					<?php _e( 'Remove all messages from the AI chat.', 'acf-block-builder' ); ?>
+				</p>
 			<?php else : ?>
 				<p><?php _e( 'Save the post to enable export.', 'acf-block-builder' ); ?></p>
 			<?php endif; ?>
@@ -332,29 +341,8 @@ class ACF_Block_Builder_Meta_Boxes {
 								<?php _e( 'Hello! Describe the block you want to build, or upload a reference image.', 'acf-block-builder' ); ?>
 							</div>
 						</div>
-					<?php else : ?>
-						<?php foreach ( $chat_history as $msg ) : ?>
-							<div class="acf-bb-message <?php echo esc_attr( $msg['type'] ); ?>-message">
-								<div class="acf-bb-avatar">
-									<span class="dashicons dashicons-<?php echo $msg['type'] === 'ai' ? 'superhero' : 'admin-users'; ?>"></span>
-								</div>
-								<div class="acf-bb-message-content">
-									<?php 
-                                    // Use specific allowed HTML for chat history to prevent breaking layout
-                                    // while allowing code blocks and custom widgets.
-                                    // wp_kses_post strips style tags and some attributes.
-                                    // We need to be more permissive for our internal chat storage.
-                                    echo $msg['content']; 
-                                    ?>
-									<?php if ( ! empty( $msg['image_url'] ) ) : ?>
-										<div class="acf-bb-chat-image">
-											<img src="<?php echo esc_url( $msg['image_url'] ); ?>" alt="Reference">
-										</div>
-									<?php endif; ?>
-								</div>
-							</div>
-						<?php endforeach; ?>
 					<?php endif; ?>
+					<?php // Chat history is rendered by JavaScript from the hidden field to handle structured data properly ?>
 				</div>
 				
 				<div class="acf-bb-chat-input-area">
@@ -393,15 +381,45 @@ class ACF_Block_Builder_Meta_Boxes {
 					</div>
 					
 					<div class="acf-bb-tabs acf-bb-diff-tabs">
-						<a href="#" class="acf-bb-tab active" data-diff-tab="block-json"><span class="dashicons dashicons-media-code"></span> block.json</a>
-						<a href="#" class="acf-bb-tab" data-diff-tab="render-php"><span class="dashicons dashicons-editor-code"></span> render.php</a>
-						<a href="#" class="acf-bb-tab" data-diff-tab="style-css"><span class="dashicons dashicons-art"></span> style.css</a>
-						<a href="#" class="acf-bb-tab" data-diff-tab="script-js"><span class="dashicons dashicons-media-default"></span> script.js</a>
-						<a href="#" class="acf-bb-tab" data-diff-tab="fields-php"><span class="dashicons dashicons-database"></span> fields.php</a>
-						<a href="#" class="acf-bb-tab" data-diff-tab="assets-php"><span class="dashicons dashicons-admin-links"></span> assets.php</a>
+						<a href="#" class="acf-bb-tab active" data-diff-tab="block-json"><span class="dashicons dashicons-media-code"></span> block.json <span class="acf-bb-tab-status"></span></a>
+						<a href="#" class="acf-bb-tab" data-diff-tab="render-php"><span class="dashicons dashicons-editor-code"></span> render.php <span class="acf-bb-tab-status"></span></a>
+						<a href="#" class="acf-bb-tab" data-diff-tab="style-css"><span class="dashicons dashicons-art"></span> style.css <span class="acf-bb-tab-status"></span></a>
+						<a href="#" class="acf-bb-tab" data-diff-tab="script-js"><span class="dashicons dashicons-media-default"></span> script.js <span class="acf-bb-tab-status"></span></a>
+						<a href="#" class="acf-bb-tab" data-diff-tab="fields-php"><span class="dashicons dashicons-database"></span> fields.php <span class="acf-bb-tab-status"></span></a>
+						<a href="#" class="acf-bb-tab" data-diff-tab="assets-php"><span class="dashicons dashicons-admin-links"></span> assets.php <span class="acf-bb-tab-status"></span></a>
 					</div>
 
-					<div id="acf-bb-diff-editor-container" class="monaco-editor-container" style="height: 60vh;"></div>
+					<!-- File-level actions toolbar -->
+					<div class="acf-bb-diff-toolbar">
+						<div class="acf-bb-diff-file-actions">
+							<button type="button" id="acf-bb-file-reject" class="button button-secondary acf-bb-file-btn" title="<?php esc_attr_e( 'Reject all changes in this file', 'acf-block-builder' ); ?>">
+								<span class="dashicons dashicons-no"></span> <?php _e( 'Undo', 'acf-block-builder' ); ?>
+							</button>
+							<button type="button" id="acf-bb-file-accept" class="button button-primary acf-bb-file-btn" title="<?php esc_attr_e( 'Accept all changes in this file', 'acf-block-builder' ); ?>">
+								<span class="dashicons dashicons-yes"></span> <?php _e( 'Keep', 'acf-block-builder' ); ?>
+							</button>
+						</div>
+						<div class="acf-bb-diff-nav">
+							<button type="button" id="acf-bb-diff-prev" class="button button-secondary" title="<?php esc_attr_e( 'Previous change', 'acf-block-builder' ); ?>">
+								<span class="dashicons dashicons-arrow-up-alt2"></span>
+							</button>
+							<span class="acf-bb-diff-counter"><span id="acf-bb-diff-current">1</span> / <span id="acf-bb-diff-total">1</span></span>
+							<button type="button" id="acf-bb-diff-next" class="button button-secondary" title="<?php esc_attr_e( 'Next change', 'acf-block-builder' ); ?>">
+								<span class="dashicons dashicons-arrow-down-alt2"></span>
+							</button>
+						</div>
+						<div class="acf-bb-diff-file-nav">
+							<button type="button" id="acf-bb-file-prev" class="button button-secondary" title="<?php esc_attr_e( 'Previous file', 'acf-block-builder' ); ?>">
+								<span class="dashicons dashicons-arrow-left-alt2"></span>
+							</button>
+							<span class="acf-bb-file-counter"><span id="acf-bb-file-current">1</span> / <span id="acf-bb-file-total">2</span> <?php _e( 'files', 'acf-block-builder' ); ?></span>
+							<button type="button" id="acf-bb-file-next" class="button button-secondary" title="<?php esc_attr_e( 'Next file', 'acf-block-builder' ); ?>">
+								<span class="dashicons dashicons-arrow-right-alt2"></span>
+							</button>
+						</div>
+					</div>
+
+					<div id="acf-bb-diff-editor-container" class="monaco-editor-container" style="height: calc(90vh - 180px);"></div>
 				</div>
 			</div>
 		</div>
@@ -421,24 +439,27 @@ class ACF_Block_Builder_Meta_Boxes {
 		<div class="acf-block-builder-container">
 			<div class="code-editors-section">
 				<div class="acf-bb-tabs">
-					<a href="#" class="acf-bb-tab active" data-tab="block-json">
+					<a href="#" class="acf-bb-tab active" data-tab="block-json" data-file-type="json">
 						<span class="dashicons dashicons-media-code"></span> block.json
 					</a>
-					<a href="#" class="acf-bb-tab" data-tab="render-php">
+					<a href="#" class="acf-bb-tab" data-tab="render-php" data-file-type="php">
 						<span class="dashicons dashicons-editor-code"></span> render.php
 					</a>
-					<a href="#" class="acf-bb-tab" data-tab="style-css">
+					<a href="#" class="acf-bb-tab" data-tab="style-css" data-file-type="css">
 						<span class="dashicons dashicons-art"></span> style.css
 					</a>
-					<a href="#" class="acf-bb-tab" data-tab="script-js">
+					<a href="#" class="acf-bb-tab" data-tab="script-js" data-file-type="js">
 						<span class="dashicons dashicons-media-default"></span> script.js
 					</a>
-					<a href="#" class="acf-bb-tab" data-tab="fields-php">
+					<a href="#" class="acf-bb-tab" data-tab="fields-php" data-file-type="fields">
 						<span class="dashicons dashicons-database"></span> fields.php
 					</a>
-					<a href="#" class="acf-bb-tab" data-tab="assets-php">
+					<a href="#" class="acf-bb-tab" data-tab="assets-php" data-file-type="assets">
 						<span class="dashicons dashicons-admin-links"></span> assets.php
 					</a>
+					<button type="button" class="acf-bb-history-btn" id="acf-bb-open-history" title="<?php esc_attr_e( 'View Version History', 'acf-block-builder' ); ?>">
+						<span class="dashicons dashicons-backup"></span>
+					</button>
 				</div>
 
 				<div class="acf-bb-editor-wrapper">
@@ -470,6 +491,82 @@ class ACF_Block_Builder_Meta_Boxes {
 					<div class="acf-bb-tab-content" id="tab-assets-php">
 						<div id="editor-assets-php" class="monaco-editor-container"></div>
 						<textarea name="acf_block_builder_assets" id="textarea-assets-php" class="hidden-textarea"><?php echo esc_textarea( $assets_php ); ?></textarea>
+					</div>
+				</div>
+			</div>
+			
+			<!-- Version History Overlay -->
+			<div id="acf-bb-version-overlay" class="acf-bb-overlay" style="display: none;">
+				<div class="acf-bb-overlay-content acf-bb-version-content">
+					<div class="acf-bb-version-header">
+						<h3><span class="dashicons dashicons-backup"></span> <?php _e( 'Version History', 'acf-block-builder' ); ?></h3>
+						<button type="button" id="acf-bb-version-close" class="acf-bb-close-btn">&times;</button>
+					</div>
+					
+					<div class="acf-bb-version-layout">
+						<!-- File tabs and version list sidebar -->
+						<div class="acf-bb-version-sidebar">
+							<div class="acf-bb-version-file-tabs">
+								<button type="button" class="acf-bb-version-file-tab active" data-file-type="json">
+									<span class="file-name">block.json</span>
+									<span class="version-count" data-count-for="json">-</span>
+								</button>
+								<button type="button" class="acf-bb-version-file-tab" data-file-type="php">
+									<span class="file-name">render.php</span>
+									<span class="version-count" data-count-for="php">-</span>
+								</button>
+								<button type="button" class="acf-bb-version-file-tab" data-file-type="css">
+									<span class="file-name">style.css</span>
+									<span class="version-count" data-count-for="css">-</span>
+								</button>
+								<button type="button" class="acf-bb-version-file-tab" data-file-type="js">
+									<span class="file-name">script.js</span>
+									<span class="version-count" data-count-for="js">-</span>
+								</button>
+								<button type="button" class="acf-bb-version-file-tab" data-file-type="fields">
+									<span class="file-name">fields.php</span>
+									<span class="version-count" data-count-for="fields">-</span>
+								</button>
+								<button type="button" class="acf-bb-version-file-tab" data-file-type="assets">
+									<span class="file-name">assets.php</span>
+									<span class="version-count" data-count-for="assets">-</span>
+								</button>
+							</div>
+							
+							<div class="acf-bb-version-list-container">
+								<div class="acf-bb-version-list" id="acf-bb-version-list">
+									<!-- Populated via JavaScript -->
+								</div>
+							</div>
+						</div>
+						
+						<!-- Diff viewer main area -->
+						<div class="acf-bb-version-main">
+							<div class="acf-bb-version-toolbar">
+								<div class="acf-bb-version-compare-info">
+									<span class="acf-bb-compare-label"><?php _e( 'Comparing:', 'acf-block-builder' ); ?></span>
+									<select id="acf-bb-version-from" class="acf-bb-version-select">
+										<option value=""><?php _e( 'Select version...', 'acf-block-builder' ); ?></option>
+									</select>
+									<span class="acf-bb-compare-arrow">→</span>
+									<select id="acf-bb-version-to" class="acf-bb-version-select">
+										<option value=""><?php _e( 'Select version...', 'acf-block-builder' ); ?></option>
+									</select>
+								</div>
+								<div class="acf-bb-version-actions">
+									<button type="button" id="acf-bb-version-restore" class="button button-primary" disabled>
+										<span class="dashicons dashicons-undo"></span> <?php _e( 'Restore Selected', 'acf-block-builder' ); ?>
+									</button>
+								</div>
+							</div>
+							
+							<div id="acf-bb-version-diff-container" class="acf-bb-version-diff-container">
+								<div class="acf-bb-version-placeholder">
+									<span class="dashicons dashicons-visibility"></span>
+									<p><?php _e( 'Select versions to compare or click on a version to preview it.', 'acf-block-builder' ); ?></p>
+								</div>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -517,6 +614,12 @@ class ACF_Block_Builder_Meta_Boxes {
 
 		// Trigger file generation
 		$this->generate_block_files( $post_id );
+
+		// Save file versions (per-file version control)
+		if ( class_exists( 'ACF_Block_Builder_File_Versions' ) ) {
+			$versions_handler = new ACF_Block_Builder_File_Versions();
+			$versions_handler->save_file_versions( $post_id );
+		}
 	}
 
 	// Public so revisions handler can call it
@@ -727,6 +830,10 @@ class ACF_Block_Builder_Meta_Boxes {
 
 		$zip->close();
 
+		while ( ob_get_level() ) {
+			ob_end_clean();
+		}
+
 		header( 'Content-Type: application/zip' );
 		header( 'Content-Disposition: attachment; filename="' . basename( $zip_file ) . '"' );
 		header( 'Content-Length: ' . filesize( $zip_file ) );
@@ -807,6 +914,10 @@ class ACF_Block_Builder_Meta_Boxes {
 		}
 
 		$zip->close();
+
+		while ( ob_get_level() ) {
+			ob_end_clean();
+		}
 
 		header( 'Content-Type: application/zip' );
 		header( 'Content-Disposition: attachment; filename="' . basename( $zip_file ) . '"' );
@@ -908,6 +1019,19 @@ class ACF_Block_Builder_Meta_Boxes {
 					'ajax_url' => admin_url( 'admin-ajax.php' ),
 					'nonce'    => wp_create_nonce( 'acf_block_builder_ai' ),
 					'export_nonce' => wp_create_nonce( 'acf_block_builder_export' ),
+					'versions_nonce' => wp_create_nonce( 'acf_block_builder_versions' ),
+					'post_id' => $post->ID,
+					'i18n' => array(
+						'version_history' => __( 'Version History', 'acf-block-builder' ),
+						'compare' => __( 'Compare', 'acf-block-builder' ),
+						'restore' => __( 'Restore', 'acf-block-builder' ),
+						'current' => __( 'Current', 'acf-block-builder' ),
+						'restored' => __( 'Restored successfully!', 'acf-block-builder' ),
+						'no_versions' => __( 'No version history yet. Save the post to create versions.', 'acf-block-builder' ),
+						'comparing' => __( 'Comparing versions...', 'acf-block-builder' ),
+						'select_versions' => __( 'Select two versions to compare', 'acf-block-builder' ),
+						'confirm_restore' => __( 'Are you sure you want to restore this version? This will replace the current content.', 'acf-block-builder' ),
+					),
 				));
 
 				wp_enqueue_style( 'acf-block-builder-css', ACF_BLOCK_BUILDER_URL . 'assets/css/block-editor.css', array(), ACF_BLOCK_BUILDER_VERSION );

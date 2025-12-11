@@ -11,6 +11,14 @@ A WordPress plugin that allows you to create and manage ACF Blocks using AI and 
 3. Enter your API key and configure your settings
 4. Start generating new ACF Blocks
 
+## Version 1.2.0 Changes
+- FIX: Resolved duplicate chat summaries in chat window
+- UPDATE: Overhauled the chat window
+- UPDATE: Previous chat history is sent with new message
+- NEW: Option to clear chat history
+- NEW: Version control individual files
+- NEW: Version control AI chat completions per file
+
 ## Version 1.1.0 Changes
 - Added live steaming of response from AI for a more intuitive experience
 - Code and tasks widgets in chat to separate conversation flow
