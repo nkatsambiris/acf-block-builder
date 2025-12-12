@@ -221,12 +221,46 @@ jQuery(document).ready(function($) {
     $('#acf-bb-model-trigger').on('click', function(e) {
         e.stopPropagation();
         var $dropdown = $('#acf-bb-model-dropdown');
+        var $trigger = $(this);
         
         if ($dropdown.is(':visible')) {
             $dropdown.hide();
         } else {
             buildModelDropdown();
-            $dropdown.show();
+            
+            // Positioning Logic: Check if it fits below
+            $dropdown.css({ 'display': 'block', 'visibility': 'hidden' }); // Show momentarily to measure
+            
+            var dropdownHeight = $dropdown.outerHeight();
+            var triggerRect = $trigger[0].getBoundingClientRect();
+            var windowHeight = $(window).height();
+            
+            // Space below the trigger
+            var spaceBelow = windowHeight - triggerRect.bottom;
+            
+            if (spaceBelow < dropdownHeight && spaceBelow < triggerRect.top) {
+                // If not enough space below AND there is more space above (or just go up if below is tight)
+                // Actually, just checking if it fits below is usually enough to decide to flip, 
+                // but checking if top has more space is safer. 
+                // Let's just flip if it doesn't fit below.
+                
+                $dropdown.css({
+                    'top': 'auto',
+                    'bottom': '100%',
+                    'margin-top': '0',
+                    'margin-bottom': '4px',
+                    'visibility': 'visible'
+                });
+            } else {
+                // Fits below or nowhere better
+                $dropdown.css({
+                    'top': '100%',
+                    'bottom': 'auto',
+                    'margin-top': '4px',
+                    'margin-bottom': '0',
+                    'visibility': 'visible'
+                });
+            }
         }
     });
     
