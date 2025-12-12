@@ -2413,7 +2413,8 @@ jQuery(document).ready(function($) {
                 // Process the accumulated text buffer (Chat vs Code)
                 while (true) {
                     if (currentMode === 'chat') {
-                        const match = processorBuffer.match(/@@@FILE:([a-z_]+)@@@/);
+                        // Permissive regex to catch variations like "FILE: block.json" or "FILE:block_json"
+                        const match = processorBuffer.match(/@@@\s*FILE\s*:\s*([a-zA-Z0-9_\-\.]+)\s*@@@/);
                         if (match) {
                             const chatText = processorBuffer.substring(0, match.index);
                             if (chatText && !suppressChatOutput) {
@@ -2421,7 +2422,15 @@ jQuery(document).ready(function($) {
                             }
                             
                             currentMode = 'code';
-                            currentFileKey = match[1];
+                            currentFileKey = match[1].trim();
+
+                            // Normalize filenames to internal keys if the AI used filenames
+                            if (currentFileKey === 'block.json') currentFileKey = 'block_json';
+                            if (currentFileKey === 'render.php') currentFileKey = 'render_php';
+                            if (currentFileKey === 'style.css') currentFileKey = 'style_css';
+                            if (currentFileKey === 'script.js') currentFileKey = 'script_js';
+                            if (currentFileKey === 'fields.php') currentFileKey = 'fields_php';
+                            if (currentFileKey === 'assets.php') currentFileKey = 'assets_php';
                             
                             // Reset suppression if we enter a new file
                             suppressChatOutput = false;
@@ -2445,15 +2454,46 @@ jQuery(document).ready(function($) {
                                             var items = txt.split('\n').filter(function(line) { return line.trim().length > 0; });
                                             $list.empty();
                                             items.forEach(function(item) {
-                                                // Clean up markdown list markers
-                                                var cleanItem = item.replace(/^[\s\-*#\d\.]+/, '').trim();
+                                                item = item.trim();
+                                                
+                                                // Check for headers (ends with ** or :)
+                                                var isHeader = false;
+                                                if (item.match(/^[\d\.]+\s+.*(\*\*|:)$/) || item.match(/^.*(\*\*|:)$/) || item.indexOf('**') === 0) {
+                                                     // If it looks like a header but starts with a list marker, treat as list item unless it's purely bold
+                                                     if (!item.match(/^[-*]\s/)) {
+                                                         isHeader = true;
+                                                     }
+                                                }
+                                                
+                                                // Clean up markdown
+                                                // Remove leading list markers only if it's a list item
+                                                var cleanItem = item;
+                                                if (!isHeader) {
+                                                    cleanItem = item.replace(/^[\s\-*#\d\.]+/, '').trim();
+                                                } else {
+                                                    // For headers, remove leading numbers/hashes but keep text
+                                                    cleanItem = item.replace(/^[#\d\.]+\s*/, '').trim();
+                                                }
+                                                
+                                                // Handle bold markdown **text**
+                                                cleanItem = cleanItem.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                                                // Handle trailing ** artifacts
+                                                cleanItem = cleanItem.replace(/\*\*$/, '');
+                                                // Handle bold at start if not closed
+                                                cleanItem = cleanItem.replace(/^\*\*/, '');
+
                                                 if (cleanItem) {
-                                                    // Process Smart Tokens in summary items
+                                                    // Process Smart Tokens
                                                     var processedItem = cleanItem;
                                                     if (window.SmartTokens && window.SmartTokens.processPlainText) {
                                                         processedItem = window.SmartTokens.processPlainText(cleanItem);
                                                     }
-                                                    $list.append('<li><span class="dashicons dashicons-yes"></span> ' + processedItem + '</li>');
+                                                    
+                                                    if (isHeader) {
+                                                        $list.append('<li class="summary-header">' + processedItem + '</li>');
+                                                    } else {
+                                                        $list.append('<li><span class="dashicons dashicons-yes"></span> ' + processedItem + '</li>');
+                                                    }
                                                 }
                                             });
                                             return txt;
@@ -2573,7 +2613,7 @@ jQuery(document).ready(function($) {
                             break; // Wait for more data
                         }
                     } else if (currentMode === 'code') {
-                        const match = processorBuffer.match(/@@@END_FILE@@@/);
+                        const match = processorBuffer.match(/@@@\s*END_FILE\s*@@@/);
                         if (match) {
                             const codeContent = processorBuffer.substring(0, match.index);
                             if (currentCodeWidget) {

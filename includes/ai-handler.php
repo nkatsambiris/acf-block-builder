@@ -261,7 +261,8 @@ class ACF_Block_Builder_AI {
 		You are an expert WordPress developer specializing in Advanced Custom Fields (ACF) Blocks in the Gutenberg editor.
 		
 		NON-NEGOTIABLE OUTPUT CONTRACT (PARSER-SAFE):
-		You MUST follow the exact streaming protocol below. If you cannot comply, you MUST output ONLY a summary file with an error and stop.
+		0) CRITICAL: NO MARKDOWN CODE BLOCKS (```) allowed in file content. Output RAW code only.
+		1) You MUST follow the exact streaming protocol below. If you cannot comply, you MUST output ONLY a summary file with an error and stop.
 		
 		FLUID STREAMING MODE:
 		1) You may include brief plain text, but ONLY lines prefixed with "CHAT:".
@@ -296,9 +297,11 @@ class ACF_Block_Builder_AI {
 		- NEVER output a diff. Always output full files.
 		- Do NOT merge multiple files into one file block. One @@@FILE block = exactly one file.
 		
-		NO MARKDOWN IN FILES:
+		NO MARKDOWN IN FILES (STRICT ENFORCEMENT):
+		- ABSOLUTELY NO MARKDOWN CODE BLOCKS (```) inside @@@FILE@@@ blocks.
 		- Do NOT wrap code in markdown code fences (e.g. ```php).
-		- Inside a file block, output raw file contents only.
+		- Inside a file block, output RAW file contents only.
+		- If you output markdown formatting, the system will fail to apply changes.
 		
 		PHP FILE RULES:
 		- Any PHP file MUST start with "<?php" as the first bytes of the file.
@@ -417,7 +420,7 @@ class ACF_Block_Builder_AI {
 		$current_message_parts = array();
 		
 		// Build prompt based on mode
-		$delimiter_reminder = ( $mode === 'agent' ) ? "\n\nRemember: Use @@@FILE:key@@@ delimiters. DO NOT WRAP CODE in markdown ``` blocks inside the delimiters." : "";
+		$delimiter_reminder = ( $mode === 'agent' ) ? "\n\nCRITICAL REMINDER: Use @@@FILE:key@@@ delimiters for all files. ABSOLUTELY NO MARKDOWN CODE BLOCKS (```) inside the file content. Output raw code only." : "";
 		
 		if ( empty( $chat_history ) || empty( $contents ) ) {
 			// No history - include system instruction in this message
@@ -548,7 +551,7 @@ class ACF_Block_Builder_AI {
 		// Add current user message
 		$user_content = array();
 		
-		$delimiter_reminder = ( $mode === 'agent' ) ? "\n\nRemember: Use @@@FILE:key@@@ delimiters. DO NOT WRAP CODE in markdown ``` blocks inside the delimiters." : "";
+		$delimiter_reminder = ( $mode === 'agent' ) ? "\n\nCRITICAL REMINDER: Use @@@FILE:key@@@ delimiters for all files. ABSOLUTELY NO MARKDOWN CODE BLOCKS (```) inside the file content. Output raw code only." : "";
 		$full_prompt = $user_prompt . $delimiter_reminder;
 		
 		// Handle image for vision models
@@ -764,7 +767,7 @@ class ACF_Block_Builder_AI {
 		}
 		
 		// Add current user message
-		$delimiter_reminder = ( $mode === 'agent' ) ? "\n\nRemember: Use @@@FILE:key@@@ delimiters. DO NOT WRAP CODE in markdown ``` blocks inside the delimiters." : "";
+		$delimiter_reminder = ( $mode === 'agent' ) ? "\n\nCRITICAL REMINDER: Use @@@FILE:key@@@ delimiters for all files. ABSOLUTELY NO MARKDOWN CODE BLOCKS (```) inside the file content. Output raw code only." : "";
 		$full_prompt = $user_prompt . $delimiter_reminder;
 		
 		// Handle image

@@ -1610,6 +1610,20 @@
     margin-bottom: 0;
 }
 
+.acf-bb-summary-list li.summary-header {
+    font-weight: 600;
+    margin-top: 10px;
+    margin-bottom: 4px;
+    color: #1d2327;
+    border-bottom: 1px solid #f0f0f1;
+    padding-bottom: 4px;
+    display: block;
+}
+
+.acf-bb-summary-list li.summary-header:first-child {
+    margin-top: 0;
+}
+
 .acf-bb-summary-list li .dashicons {
     color: #2271b1;
     margin-top: 2px;
