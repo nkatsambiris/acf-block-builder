@@ -101,8 +101,62 @@
         ];
     }
 
+    function getAcfFieldTypes() {
+        return [
+            // Basic
+            { id: 'ft_text', label: 'Text', icon: 'editor-textcolor', type: 'field_type', data: { description: 'Single line text input' } },
+            { id: 'ft_textarea', label: 'Text Area', icon: 'editor-paragraph', type: 'field_type', data: { description: 'Multiple line text input' } },
+            { id: 'ft_number', label: 'Number', icon: 'editor-ol', type: 'field_type', data: { description: 'Numeric input' } },
+            { id: 'ft_range', label: 'Range', icon: 'leftright', type: 'field_type', data: { description: 'Range slider input' } },
+            { id: 'ft_email', label: 'Email', icon: 'email', type: 'field_type', data: { description: 'Email address input' } },
+            { id: 'ft_url', label: 'Url', icon: 'admin-links', type: 'field_type', data: { description: 'URL input' } },
+            { id: 'ft_password', label: 'Password', icon: 'lock', type: 'field_type', data: { description: 'Password input' } },
+            
+            // Content
+            { id: 'ft_image', label: 'Image', icon: 'format-image', type: 'field_type', data: { description: 'Image upload/selection' } },
+            { id: 'ft_file', label: 'File', icon: 'media-default', type: 'field_type', data: { description: 'File upload/selection' } },
+            { id: 'ft_wysiwyg', label: 'Wysiwyg Editor', icon: 'editor-table', type: 'field_type', data: { description: 'Rich text editor' } },
+            { id: 'ft_oembed', label: 'oEmbed', icon: 'format-video', type: 'field_type', data: { description: 'Embed videos and other content' } },
+            { id: 'ft_gallery', label: 'Gallery', icon: 'format-gallery', type: 'field_type', data: { description: 'Gallery of images' } },
+
+            // Choice
+            { id: 'ft_select', label: 'Select', icon: 'menu', type: 'field_type', data: { description: 'Drop down list' } },
+            { id: 'ft_checkbox', label: 'Checkbox', icon: 'forms', type: 'field_type', data: { description: 'Checkbox inputs' } },
+            { id: 'ft_radio', label: 'Radio Button', icon: 'marker', type: 'field_type', data: { description: 'Radio button inputs' } },
+            { id: 'ft_button_group', label: 'Button Group', icon: 'screenoptions', type: 'field_type', data: { description: 'Radio button group' } },
+            { id: 'ft_true_false', label: 'True / False', icon: 'yes', type: 'field_type', data: { description: 'True/false toggle' } },
+            
+            // Relational
+            { id: 'ft_link', label: 'Link', icon: 'admin-links', type: 'field_type', data: { description: 'Link selection' } },
+            { id: 'ft_post_object', label: 'Post Object', icon: 'admin-post', type: 'field_type', data: { description: 'Select one or more posts' } },
+            { id: 'ft_page_link', label: 'Page Link', icon: 'admin-page', type: 'field_type', data: { description: 'Link to a post/page' } },
+            { id: 'ft_relationship', label: 'Relationship', icon: 'randomize', type: 'field_type', data: { description: 'Advanced relationship with posts' } },
+            { id: 'ft_taxonomy', label: 'Taxonomy', icon: 'tag', type: 'field_type', data: { description: 'Select taxonomy terms' } },
+            { id: 'ft_user', label: 'User', icon: 'admin-users', type: 'field_type', data: { description: 'Select one or more users' } },
+            
+            // jQuery
+            { id: 'ft_google_map', label: 'Google Map', icon: 'location', type: 'field_type', data: { description: 'Google Map input' } },
+            { id: 'ft_date_picker', label: 'Date Picker', icon: 'calendar', type: 'field_type', data: { description: 'Date selector' } },
+            { id: 'ft_date_time_picker', label: 'Date Time Picker', icon: 'calendar-alt', type: 'field_type', data: { description: 'Date and time selector' } },
+            { id: 'ft_time_picker', label: 'Time Picker', icon: 'clock', type: 'field_type', data: { description: 'Time selector' } },
+            { id: 'ft_color_picker', label: 'Color Picker', icon: 'color-picker', type: 'field_type', data: { description: 'Color selector' } },
+            
+            // Layout
+            { id: 'ft_message', label: 'Message', icon: 'format-status', type: 'field_type', data: { description: 'Text message (no input)' } },
+            { id: 'ft_accordion', label: 'Accordion', icon: 'list-view', type: 'field_type', data: { description: 'Accordion container' } },
+            { id: 'ft_tab', label: 'Tab', icon: 'index-card', type: 'field_type', data: { description: 'Tab container' } },
+            { id: 'ft_group', label: 'Group', icon: 'category', type: 'field_type', data: { description: 'Group sub fields' } },
+            { id: 'ft_repeater', label: 'Repeater', icon: 'controls-repeat', type: 'field_type', data: { description: 'Repeat sub fields' } },
+            { id: 'ft_flexible_content', label: 'Flexible Content', icon: 'layout', type: 'field_type', data: { description: 'Flexible content layout' } },
+            { id: 'ft_clone', label: 'Clone', icon: 'admin-page', type: 'field_type', data: { description: 'Clone other fields' } }
+        ];
+    }
+
     function getAvailableItems() {
         var items = getAvailableFiles();
+        
+        // Add ACF Field Types
+        items = items.concat(getAcfFieldTypes());
         
         // Add WordPress data items if loaded
         if (state.wpDataLoaded && state.wpData) {
@@ -222,7 +276,8 @@
             post_type: [],
             taxonomy: [],
             field_group: [],
-            field: []
+            field: [],
+            field_type: []
         };
         
         itemList.forEach(function(item) {
@@ -299,14 +354,16 @@
                 'post_type': 'Post Types',
                 'taxonomy': 'Taxonomies',
                 'field_group': 'Field Groups',
-                'field': 'Fields'
+                'field': 'Fields',
+                'field_type': 'Field Types'
             };
             var categoryIcons = {
                 'file': 'media-code',
                 'post_type': 'admin-post',
                 'taxonomy': 'tag',
                 'field_group': 'list-view',
-                'field': 'editor-ul'
+                'field': 'editor-ul',
+                'field_type': 'editor-table'
             };
             
             // Back button
@@ -354,7 +411,8 @@
                 { key: 'post_type', label: 'Post Types', icon: 'admin-post' },
                 { key: 'taxonomy', label: 'Taxonomies', icon: 'tag' },
                 { key: 'field_group', label: 'Field Groups', icon: 'list-view' },
-                { key: 'field', label: 'Fields', icon: 'editor-ul' }
+                { key: 'field', label: 'Fields', icon: 'editor-ul' },
+                { key: 'field_type', label: 'Field Types', icon: 'editor-table' }
             ];
             
             allCategories.forEach(function(category) {
@@ -415,7 +473,8 @@
                 { key: 'post_type', label: 'Post Types' },
                 { key: 'taxonomy', label: 'Taxonomies' },
                 { key: 'field_group', label: 'Field Groups' },
-                { key: 'field', label: 'Fields' }
+                { key: 'field', label: 'Fields' },
+                { key: 'field_type', label: 'Field Types' }
             ];
             
             categories.forEach(function(category) {
@@ -457,7 +516,7 @@
             count = 1 + (grouped[state.currentCategory] || []).length;
         } else if (!state.filterText) {
             // In overview: dynamically count based on threshold
-            var allCategories = ['file', 'post_type', 'taxonomy', 'field_group', 'field'];
+            var allCategories = ['file', 'post_type', 'taxonomy', 'field_group', 'field', 'field_type'];
             
             allCategories.forEach(function(key) {
                 var categoryItems = grouped[key];
@@ -831,7 +890,7 @@
         var hasFiles = tokens.some(function(t) { return t.type === 'file'; });
         var hasErrors = tokens.some(function(t) { return t.type === 'error'; });
         var hasWPData = tokens.some(function(t) { 
-            return ['post_type', 'taxonomy', 'field_group', 'field'].indexOf(t.type) !== -1;
+            return ['post_type', 'taxonomy', 'field_group', 'field', 'field_type'].indexOf(t.type) !== -1;
         });
         
         // Handle error tokens
@@ -864,6 +923,8 @@
                     context += formatFieldGroupContext(token.data);
                 } else if (token.type === 'field') {
                     context += formatFieldContext(token.data);
+                } else if (token.type === 'field_type') {
+                    context += formatFieldTypeContext(token.data, token.label);
                 }
             });
             
@@ -988,6 +1049,15 @@
             }
         }
         
+        context += '\n';
+        return context;
+    }
+
+    function formatFieldTypeContext(data, label) {
+        var context = '[ACF FIELD TYPE: ' + label + ']\n';
+        if (data && data.description) {
+            context += '- Description: ' + data.description + '\n';
+        }
         context += '\n';
         return context;
     }
