@@ -48,6 +48,7 @@ class ACF_Block_Builder_Settings {
 		register_setting( 'acf_block_builder_settings', 'acf_block_builder_gemini_api_key' );
 		register_setting( 'acf_block_builder_settings', 'acf_block_builder_openai_api_key' );
 		register_setting( 'acf_block_builder_settings', 'acf_block_builder_anthropic_api_key' );
+		register_setting( 'acf_block_builder_settings', 'acf_block_builder_custom_instructions' );
 		register_setting( 'acf_block_builder_settings', 'acf_block_builder_debug_enabled' );
 	}
 
@@ -152,6 +153,26 @@ class ACF_Block_Builder_Settings {
 											<?php esc_html_e( 'Add code to your active theme\'s functions.php to automatically load blocks from the "blocks" directory.', 'acf-block-builder' ); ?>
 										</p>
 									<?php endif; ?>
+								</div>
+							</div>
+						</div>
+
+						<!-- Custom Instructions Card -->
+						<div class="acf-block-builder-card">
+							<div class="acf-block-builder-card-header">
+								<h2><?php esc_html_e( 'Custom Instructions', 'acf-block-builder' ); ?></h2>
+							</div>
+							<div class="acf-block-builder-card-body">
+								<p class="acf-block-builder-description" style="margin-bottom: 20px;">
+									<?php esc_html_e( 'Add custom instructions that will be sent with every request. Use this to enforce coding standards, CSS frameworks, or specific requirements.', 'acf-block-builder' ); ?>
+								</p>
+								<div class="acf-block-builder-field-group">
+									<label class="acf-block-builder-field-label" for="acf_block_builder_custom_instructions">
+										<?php esc_html_e( 'Global Prompt Instructions', 'acf-block-builder' ); ?>
+									</label>
+									<div class="acf-block-builder-input-wrapper">
+										<textarea id="acf_block_builder_custom_instructions" name="acf_block_builder_custom_instructions" rows="5" class="large-text code" placeholder="e.g. Always use Tailwind CSS. Do not use jQuery."><?php echo esc_textarea( get_option( 'acf_block_builder_custom_instructions' ) ); ?></textarea>
+									</div>
 								</div>
 							</div>
 						</div>
