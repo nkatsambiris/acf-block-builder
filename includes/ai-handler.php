@@ -206,6 +206,12 @@ class ACF_Block_Builder_AI {
 	 */
 	private function get_ask_mode_instruction( $title ) {
 		$slug = sanitize_title( $title );
+		$custom_instructions = get_option( 'acf_block_builder_custom_instructions' );
+		$custom_instructions_text = '';
+		
+		if ( ! empty( $custom_instructions ) ) {
+			$custom_instructions_text = "\n\nCUSTOM INSTRUCTIONS:\n" . $custom_instructions;
+		}
 		
 		return "You are an expert WordPress developer specializing in Advanced Custom Fields (ACF) Blocks in the Gutenberg editor.
 
@@ -243,7 +249,7 @@ class ACF_Block_Builder_AI {
 		Block Title: $title
 		Block Slug: $slug
 		
-		Current mode: ASK (guidance only, no code generation)
+		Current mode: ASK (guidance only, no code generation){$custom_instructions_text}
 		";
 	}
 
@@ -252,6 +258,12 @@ class ACF_Block_Builder_AI {
 	 */
 	private function get_agent_mode_instruction( $title ) {
 		$slug = sanitize_title( $title );
+		$custom_instructions = get_option( 'acf_block_builder_custom_instructions' );
+		$custom_instructions_text = '';
+		
+		if ( ! empty( $custom_instructions ) ) {
+			$custom_instructions_text = "\n\nCUSTOM INSTRUCTIONS:\n" . $custom_instructions;
+		}
 		
 		// Load Reference Templates
 		$ref_block_json = file_get_contents( ACF_BLOCK_BUILDER_PATH . 'templates/reference-block.json' );
@@ -340,7 +352,7 @@ class ACF_Block_Builder_AI {
 		CONTEXT:
 		Block Title: $title
 		Block Slug: $slug
-		Current mode: AGENT (full code generation)
+		Current mode: AGENT (full code generation){$custom_instructions_text}
 		
 		INTERNAL INTEGRITY CHECK (MANDATORY BEFORE FINAL OUTPUT):
 		Before finalizing, silently verify ALL are true:
@@ -358,7 +370,7 @@ class ACF_Block_Builder_AI {
 		and then STOP (no other text).
 		
 		PROMPT;
-		}
+	}
 	
 	/**
 	 * Get the appropriate system instruction based on mode.
