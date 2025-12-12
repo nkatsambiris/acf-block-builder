@@ -278,27 +278,17 @@ jQuery(document).ready(function($) {
         }
     }
     
-    // Enable/Disable Send Button
+    // Enable/Disable Send Button - now handled by MentionAutocomplete for contenteditable
+    // Fallback for textarea if MentionAutocomplete not loaded
     $('#acf_block_builder_prompt').on('input', function() {
+        if (window.MentionAutocomplete) return; // Let MentionAutocomplete handle it
         var hasText = $(this).val().trim().length > 0;
         var hasImage = $('#acf_block_builder_image_id').val().length > 0;
         $('#acf-block-builder-generate').prop('disabled', !hasText && !hasImage);
     });
     
-    // Auto-resize textarea
-    $('#acf_block_builder_prompt').on('input', function() {
-        this.style.height = 'auto';
-        this.style.height = Math.min(this.scrollHeight, 200) + 'px';
-    });
-    
-    // Mention Files Button (placeholder for future functionality)
-    $('#acf-bb-mention-files').on('click', function() {
-        var $textarea = $('#acf_block_builder_prompt');
-        var currentText = $textarea.val();
-        $textarea.val(currentText + '@').focus();
-        // TODO: Show file picker dropdown
-    });
-    
+    // Mention Files Button - handled by MentionAutocomplete module
+
     // Remove attachment
     $(document).on('click', '.acf-bb-remove-attachment', function() {
         $('#acf_block_builder_image_id').val('');
@@ -333,6 +323,109 @@ jQuery(document).ready(function($) {
                 '</div>';
             $('#acf-bb-chat-messages').append(welcomeHtml);
         }
+    });
+
+    // ==========================================
+    // ERROR CHIP POPOVER
+    // ==========================================
+    
+    // Create popover element
+    var $errorPopover = $('<div class="acf-bb-error-popover"></div>').appendTo('body');
+    var popoverHideTimeout = null;
+    
+    function showErrorPopover($chip) {
+        var tooltip = $chip.data('tooltip');
+        if (!tooltip) return;
+        
+        // Parse tooltip content and build HTML
+        var lines = tooltip.split('\n');
+        var html = '<div class="acf-bb-error-popover-title"><span class="dashicons dashicons-warning"></span> Code Errors</div>';
+        
+        var currentFile = null;
+        var errorList = [];
+        
+        lines.forEach(function(line) {
+            line = line.trim();
+            if (!line) return;
+            
+            if (line.startsWith('<strong>')) {
+                // It's a file name
+                if (currentFile && errorList.length) {
+                    html += '<div class="acf-bb-error-popover-file">' + currentFile + '</div>';
+                    html += '<ul class="acf-bb-error-popover-list">' + errorList.join('') + '</ul>';
+                    errorList = [];
+                }
+                currentFile = line.replace(/<\/?strong>/g, '');
+            } else if (line.startsWith('•')) {
+                // It's an error line
+                var errorText = line.substring(1).trim();
+                // Highlight line numbers
+                errorText = errorText.replace(/^(Line \d+):/, '<span class="acf-bb-error-popover-line">$1</span>:');
+                errorList.push('<li>' + errorText + '</li>');
+            }
+        });
+        
+        // Add last file if any
+        if (currentFile && errorList.length) {
+            html += '<div class="acf-bb-error-popover-file">' + currentFile + '</div>';
+            html += '<ul class="acf-bb-error-popover-list">' + errorList.join('') + '</ul>';
+        }
+        
+        $errorPopover.html(html);
+        
+        // Position popover above the chip
+        var chipOffset = $chip.offset();
+        var chipWidth = $chip.outerWidth();
+        var chipHeight = $chip.outerHeight();
+        var popoverWidth = $errorPopover.outerWidth();
+        var popoverHeight = $errorPopover.outerHeight();
+        
+        var left = chipOffset.left + (chipWidth / 2) - (popoverWidth / 2);
+        var top = chipOffset.top - popoverHeight - 10;
+        
+        // Keep within viewport
+        if (left < 10) left = 10;
+        if (left + popoverWidth > $(window).width() - 10) {
+            left = $(window).width() - popoverWidth - 10;
+        }
+        
+        // If would go above viewport, show below instead
+        if (top < 10) {
+            top = chipOffset.top + chipHeight + 10;
+            $errorPopover.addClass('below');
+        } else {
+            $errorPopover.removeClass('below');
+        }
+        
+        $errorPopover.css({
+            left: left + 'px',
+            top: top + 'px'
+        });
+        
+        clearTimeout(popoverHideTimeout);
+        $errorPopover.addClass('visible');
+    }
+    
+    function hideErrorPopover() {
+        popoverHideTimeout = setTimeout(function() {
+            $errorPopover.removeClass('visible');
+        }, 100);
+    }
+    
+    // Show popover on hover
+    $(document).on('mouseenter', '.acf-bb-error-token-chip[data-tooltip], .acf-bb-error-chip[data-tooltip]', function() {
+        showErrorPopover($(this));
+    });
+    
+    $(document).on('mouseleave', '.acf-bb-error-token-chip[data-tooltip], .acf-bb-error-chip[data-tooltip]', function() {
+        hideErrorPopover();
+    });
+    
+    // Keep popover visible when hovering over it
+    $errorPopover.on('mouseenter', function() {
+        clearTimeout(popoverHideTimeout);
+    }).on('mouseleave', function() {
+        hideErrorPopover();
     });
 
     function saveChatHistory() {
@@ -415,7 +508,7 @@ jQuery(document).ready(function($) {
     // Run enhancement
     initEnhancedHeader();
 
-    function appendMessage(type, content, imageUrl, skipSave, provider) {
+    function appendMessage(type, content, imageUrl, skipSave, provider, attachedTokens) {
         var icon = type === 'ai' ? 'superhero' : 'admin-users';
         var html = '<div class="acf-bb-message ' + type + '-message">';
         
@@ -443,7 +536,8 @@ jQuery(document).ready(function($) {
                 type: type, 
                 text: plainText, 
                 image_url: imageUrl || null,
-                provider: provider || null
+                provider: provider || null,
+                attachedTokens: attachedTokens || null  // Save attached tokens for restoration
             });
             saveChatHistory();
         }
@@ -488,8 +582,48 @@ jQuery(document).ready(function($) {
             // Escape HTML entities for safe display
             displayContent = $('<div>').text(displayContent).html();
             
+            // Reconstruct attached tokens (error chips, file chips) if saved
+            var tokenChipsHtml = '';
+            if (msg.attachedTokens && msg.attachedTokens.length > 0) {
+                tokenChipsHtml = msg.attachedTokens.map(function(token) {
+                    if (token.type === 'error') {
+                        // Build tooltip content for error chip
+                        var tooltipLines = [];
+                        if (token.details) {
+                            token.details.forEach(function(detail) {
+                                tooltipLines.push('<strong>' + $('<div>').text(detail.file).html() + '</strong>');
+                                detail.errors.forEach(function(err) {
+                                    tooltipLines.push('• Line ' + err.line + ': ' + $('<div>').text(err.message).html());
+                                });
+                            });
+                        }
+                        return '<span class="acf-bb-token-chip acf-bb-error-token-chip" data-token-type="error" data-tooltip="' + 
+                               tooltipLines.join('\n').replace(/"/g, '&quot;') + '">' +
+                               '<span class="dashicons dashicons-warning"></span>' +
+                               '<span class="acf-bb-token-label">' + token.count + ' Error' + (token.count !== 1 ? 's' : '') + '</span></span>';
+                    } else if (token.type === 'file') {
+                        return '<span class="acf-bb-token-chip" data-token-type="file" data-tab-id="' + token.tabId + '">' +
+                               '<span class="dashicons dashicons-' + token.icon + '"></span>' +
+                               '<span class="acf-bb-token-label">' + token.label + '</span></span>';
+                    }
+                    return '';
+                }).join(' ');
+                
+                if (tokenChipsHtml) {
+                    tokenChipsHtml += ' ';
+                }
+            }
+            
+            // Process Smart Tokens (file references become clickable chips)
+            if (window.SmartTokens && window.SmartTokens.processMessageContent) {
+                displayContent = window.SmartTokens.processMessageContent(displayContent);
+            }
+            
+            // Prepend token chips to display content
+            displayContent = tokenChipsHtml + displayContent;
+            
             // Wrap in paragraph tags
-            if (displayContent && !displayContent.startsWith('<p>')) {
+            if (displayContent && !displayContent.startsWith('<p>') && !displayContent.startsWith('<span')) {
                 displayContent = '<p>' + displayContent + '</p>';
             }
             
@@ -533,7 +667,12 @@ jQuery(document).ready(function($) {
                 html += '<div class="acf-bb-summary-header"><span class="dashicons dashicons-list-view"></span> Change Summary</div>';
                 html += '<ul class="acf-bb-summary-list">';
                 msg.summary.forEach(function(item) {
-                    html += '<li><span class="dashicons dashicons-yes"></span> ' + $('<div>').text(item).html() + '</li>';
+                    // Process Smart Tokens in summary items
+                    var processedItem = $('<div>').text(item).html();
+                    if (window.SmartTokens && window.SmartTokens.processPlainText) {
+                        processedItem = window.SmartTokens.processPlainText(item);
+                    }
+                    html += '<li><span class="dashicons dashicons-yes"></span> ' + processedItem + '</li>';
                 });
                 html += '</ul></div>';
             }
@@ -615,6 +754,12 @@ jQuery(document).ready(function($) {
             if (para) {
                 // Replace single newlines within a paragraph with spaces
                 para = para.replace(/\n/g, ' ');
+                
+                // Process Smart Tokens (file references become clickable chips)
+                if (window.SmartTokens && window.SmartTokens.processPlainText) {
+                    para = window.SmartTokens.processPlainText(para);
+                }
+                
                 html += '<p>' + para + '</p>';
             }
         });
@@ -1401,32 +1546,39 @@ jQuery(document).ready(function($) {
             var data = collectAllProblems();
             if (data.total === 0) return;
             
-            // Build AI prompt with all errors
-            var prompt = 'Please fix the following code errors:\n\n';
-            
+            // Build error data for the chip
+            var errorDetails = [];
             Object.keys(data.problems).forEach(function(tabId) {
                 var fileName = fileNameMap[tabId] || tabId;
                 var fileProblems = data.problems[tabId];
                 
-                prompt += '**' + fileName + ':**\n';
-                fileProblems.forEach(function(problem) {
-                    prompt += '- Line ' + problem.line + ': ' + problem.message + '\n';
+                errorDetails.push({
+                    file: fileName,
+                    tabId: tabId,
+                    errors: fileProblems.map(function(problem) {
+                        return {
+                            line: problem.line,
+                            message: problem.message
+                        };
+                    })
                 });
-                prompt += '\n';
             });
             
-            prompt += 'Please analyze these errors and provide the corrected code.';
-            
-            // Set the prompt in the chat input
-            var $textarea = $('#acf_block_builder_prompt');
-            $textarea.val(prompt);
-            $textarea.trigger('input'); // Trigger resize and enable send button
-            
-            // Scroll to chat and focus
-            $textarea.focus();
-            
-            // Optionally scroll the chat section into view
-            $('.ai-chat-section')[0]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Insert error chip using MentionAutocomplete
+            if (window.MentionAutocomplete && window.MentionAutocomplete.insertErrorChip) {
+                window.MentionAutocomplete.insertErrorChip({
+                    count: data.total,
+                    details: errorDetails
+                });
+                
+                // Scroll chat section into view
+                $('.ai-chat-section')[0]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
+                // Auto-submit after a brief delay to allow user to see the chip
+                setTimeout(function() {
+                    $('#acf-block-builder-generate').click();
+                }, 100);
+            }
         });
         
         // Update problems panel when markers change
@@ -1629,6 +1781,15 @@ jQuery(document).ready(function($) {
         
         // Initialize Monaco editors for new format history (with stored code)
         initHistoryMonacoEditors();
+        
+        // Initialize Mention Autocomplete with access to editors
+        if (window.MentionAutocomplete) {
+            window.MentionAutocomplete.init({
+                textareaSelector: '#acf_block_builder_prompt',
+                previewSelector: '#acf-bb-mention-preview',
+                editorsGetter: function() { return editors; }
+            });
+        }
     });
 
     function showDiffOverlay(data) {
@@ -1914,10 +2075,19 @@ jQuery(document).ready(function($) {
 
     $('#acf-block-builder-generate').on('click', async function(e) {
         e.preventDefault();
-        var prompt = $('#acf_block_builder_prompt').val().trim();
-        var imageId = $('#acf_block_builder_image_id').val();
         
-        if (!prompt && !imageId) {
+        // Get prompt from MentionAutocomplete (contenteditable) or fallback to textarea
+        var prompt = '';
+        if (window.MentionAutocomplete && window.MentionAutocomplete.getPlainText) {
+            prompt = window.MentionAutocomplete.getPlainText().trim();
+        } else {
+            prompt = $('#acf_block_builder_prompt').val().trim();
+        }
+        
+        var imageId = $('#acf_block_builder_image_id').val();
+        var hasAttachedFiles = window.MentionAutocomplete && window.MentionAutocomplete.getAttachedTokens().length > 0;
+        
+        if (!prompt && !imageId && !hasAttachedFiles) {
             alert('Please describe your block or upload an image.');
             return;
         }
@@ -1929,17 +2099,60 @@ jQuery(document).ready(function($) {
         // This ensures we don't duplicate the current message in the API call
         var historyToSend = JSON.stringify(chatHistory);
         
-        // Add User Message
+        // Add User Message with attached files info
         var imageUrl = '';
         if (imageId) {
             var $img = $('#acf-bb-image-preview-mini img');
             if ($img.length) imageUrl = $img.attr('src');
         }
         
-        appendMessage('user', prompt || 'Generating block from image...', imageUrl);
+        // Build display message with attached chips (files and errors)
+        var displayMessage = prompt || 'Generating block from image...';
+        var attachedTokens = window.MentionAutocomplete ? window.MentionAutocomplete.getAttachedTokens() : [];
+        if (attachedTokens.length > 0) {
+            var chips = attachedTokens.map(function(token) {
+                if (token.type === 'error') {
+                    // Build tooltip lines for error chip (for custom popover)
+                    var tooltipLines = [];
+                    if (token.details) {
+                        token.details.forEach(function(detail) {
+                            tooltipLines.push('<strong>' + detail.file + '</strong>');
+                            detail.errors.forEach(function(err) {
+                                tooltipLines.push('• Line ' + err.line + ': ' + err.message);
+                            });
+                        });
+                    }
+                    
+                    return '<span class="acf-bb-token-chip acf-bb-error-token-chip" data-token-type="error" data-tooltip="' + 
+                           tooltipLines.join('\n').replace(/"/g, '&quot;') + '">' +
+                           '<span class="dashicons dashicons-warning"></span>' +
+                           '<span class="acf-bb-token-label">' + token.count + ' Error' + (token.count !== 1 ? 's' : '') + '</span></span>';
+                } else {
+                    // File chip
+                    return '<span class="acf-bb-token-chip" data-token-type="file" data-tab-id="' + token.tabId + '">' +
+                           '<span class="dashicons dashicons-' + token.icon + '"></span>' +
+                           '<span class="acf-bb-token-label">' + token.label + '</span></span>';
+                }
+            }).join(' ');
+            displayMessage = chips + ' ' + displayMessage;
+        }
         
-        // Clear input
-        $('#acf_block_builder_prompt').val('').css('height', 'auto');
+        // Get attached context and tokens BEFORE clearing (important!)
+        var mentionContext = '';
+        var savedAttachedTokens = null;
+        if (window.MentionAutocomplete) {
+            mentionContext = window.MentionAutocomplete.getContextString();
+            savedAttachedTokens = window.MentionAutocomplete.getAttachedTokens();
+        }
+        
+        appendMessage('user', displayMessage, imageUrl, false, null, savedAttachedTokens);
+        
+        // Clear input - clear contenteditable editor and textarea
+        if (window.MentionAutocomplete) {
+            window.MentionAutocomplete.clearAttached();
+        }
+        $('#acf_block_builder_prompt').val('');
+        $('#acf-bb-prompt-editor').empty();
         $('#acf_block_builder_image_id').val('');
         $('#acf-bb-image-preview-mini').hide().html('');
         $('#acf-bb-upload-image').removeClass('active');
@@ -1958,10 +2171,16 @@ jQuery(document).ready(function($) {
         // Get Current Code Context
         var currentCode = getCurrentCode();
         
+        // Prepend attached context to prompt (from @ mentions and error chips)
+        var finalPrompt = prompt;
+        if (mentionContext) {
+            finalPrompt = mentionContext + prompt;
+        }
+        
         var formData = new FormData();
         formData.append('action', 'acf_block_builder_generate');
         formData.append('nonce', acfBlockBuilder.nonce);
-        formData.append('prompt', prompt);
+        formData.append('prompt', finalPrompt);
         formData.append('image_id', imageId);
         formData.append('title', $('#title').val()); // Get post title
         formData.append('current_code', currentCode);
@@ -2155,7 +2374,12 @@ jQuery(document).ready(function($) {
                                                 // Clean up markdown list markers
                                                 var cleanItem = item.replace(/^[\s\-*#\d\.]+/, '').trim();
                                                 if (cleanItem) {
-                                                     $list.append('<li><span class="dashicons dashicons-yes"></span> ' + cleanItem + '</li>');
+                                                    // Process Smart Tokens in summary items
+                                                    var processedItem = cleanItem;
+                                                    if (window.SmartTokens && window.SmartTokens.processPlainText) {
+                                                        processedItem = window.SmartTokens.processPlainText(cleanItem);
+                                                    }
+                                                    $list.append('<li><span class="dashicons dashicons-yes"></span> ' + processedItem + '</li>');
                                                 }
                                             });
                                             return txt;

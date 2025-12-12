@@ -344,8 +344,8 @@ class ACF_Block_Builder_Meta_Boxes {
 							<button type="button" id="acf-bb-upload-image" class="acf-bb-icon-btn" title="<?php _e( 'Attach Image', 'acf-block-builder' ); ?>">
 								<span class="dashicons dashicons-paperclip"></span>
 							</button>
-							<button type="button" id="acf-bb-mention-files" class="acf-bb-icon-btn" title="<?php _e( 'Mention Files (@)', 'acf-block-builder' ); ?>">
-								<span class="dashicons dashicons-media-code"></span>
+							<button type="button" id="acf-bb-mention-files" class="acf-bb-icon-btn acf-bb-mention-btn" title="<?php _e( 'Mention Files (@)', 'acf-block-builder' ); ?>">
+								<span class="acf-bb-at-symbol">@</span>
 							</button>
 						</div>
 						
@@ -1129,7 +1129,13 @@ class ACF_Block_Builder_Meta_Boxes {
 				// instead of a global, breaking WP scripts that expect window.Backbone.
 				wp_enqueue_script( 'monaco-editor', 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.js', array( 'jquery', 'underscore', 'wp-backbone', 'wp-util', 'php-parser' ), '0.44.0', true );
 				
-				wp_enqueue_script( 'acf-block-builder-js', ACF_BLOCK_BUILDER_URL . 'assets/js/block-editor.js', array( 'jquery', 'monaco-editor' ), ACF_BLOCK_BUILDER_VERSION, true );
+				// Smart Tokens module for clickable file references
+				wp_enqueue_script( 'acf-bb-smart-tokens', ACF_BLOCK_BUILDER_URL . 'assets/js/smart-tokens.js', array( 'jquery' ), ACF_BLOCK_BUILDER_VERSION, true );
+				
+				// Mention Autocomplete module for @ file references
+				wp_enqueue_script( 'acf-bb-mention-autocomplete', ACF_BLOCK_BUILDER_URL . 'assets/js/mention-autocomplete.js', array( 'jquery', 'acf-bb-smart-tokens' ), ACF_BLOCK_BUILDER_VERSION, true );
+				
+				wp_enqueue_script( 'acf-block-builder-js', ACF_BLOCK_BUILDER_URL . 'assets/js/block-editor.js', array( 'jquery', 'monaco-editor', 'acf-bb-smart-tokens', 'acf-bb-mention-autocomplete' ), ACF_BLOCK_BUILDER_VERSION, true );
 				
 				wp_localize_script( 'acf-block-builder-js', 'acfBlockBuilder', array(
 					'ajax_url' => admin_url( 'admin-ajax.php' ),

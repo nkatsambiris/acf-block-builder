@@ -229,6 +229,16 @@ class ACF_Block_Builder_AI {
 		
 		Keep responses conversational, helpful, and educational. Focus on teaching and guiding rather than doing the work.
 		
+		FILE REFERENCES:
+		When mentioning block files, always wrap the file name in backticks:
+		- Use \`block.json\` not block.json
+		- Use \`render.php\` not render.php
+		- Use \`style.css\` not style.css
+		- Use \`script.js\` not script.js
+		- Use \`fields.php\` not fields.php
+		- Use \`assets.php\` not assets.php
+		This ensures file references are properly highlighted in the chat interface.
+		
 		CONTEXT:
 		Block Title: $title
 		Block Slug: $slug
@@ -295,12 +305,22 @@ class ACF_Block_Builder_AI {
 		
 		CRITICAL RULES:
 		- Do NOT output the summary as plain text at the end. ALWAYS use @@@FILE:summary@@@.
-		- Do NOT wrap the code in markdown code blocks (like ```php). Just output the raw code between the delimiters.
+		- Do NOT wrap the code in markdown code blocks (like \`\`\`php). Just output the raw code between the delimiters.
 		- Do NOT output a single large JSON object. Output file by file mixed with chat.
 		- Do NOT change the 'blockVersion' in the block.json file.
 		- Always ensure any .php files start with <?php and end with ?> tags.
 		- Verify complex fields (Link, Image) are arrays using !empty() && is_array().
 		- Initialize variables.
+		
+		FILE REFERENCES:
+		When mentioning block files in your explanations or summaries, always wrap the file name in backticks:
+		- Use \`block.json\` not block.json
+		- Use \`render.php\` not render.php
+		- Use \`style.css\` not style.css
+		- Use \`script.js\` not script.js
+		- Use \`fields.php\` not fields.php
+		- Use \`assets.php\` not assets.php
+		This ensures file references are properly highlighted in the chat interface.
 		
 		JAVASCRIPT/TYPESCRIPT BEST PRACTICES:
 		- When writing JavaScript code that uses WordPress/ACF/jQuery globals, use @ts-ignore comments to suppress TypeScript linting errors.

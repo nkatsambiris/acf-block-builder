@@ -4,6 +4,10 @@
     position: relative;
 }
 
+.post-type-acf_block_builder div#submitdiv {
+    display: none;
+}
+
 /* Chat Interface */
 .acf-bb-chat-interface {
     border-radius: 4px;
@@ -413,6 +417,14 @@
 .acf-bb-icon-btn.active {
     background: #e0f2fe;
     color: #0284c7;
+}
+
+/* @ Mention Button */
+.acf-bb-mention-btn .acf-bb-at-symbol {
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1;
+    color: #646970;
 }
 
 .acf-bb-input-field textarea {
@@ -2038,4 +2050,621 @@
         flex: 1 1 auto;
         min-width: 100px;
     }
+}
+
+/* ==========================================
+   SMART TOKENS - Clickable File Chips
+   ========================================== */
+
+.acf-bb-token-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px 2px 6px;
+    margin: 0 2px;
+    background: #f0f0f1;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    font-weight: 500;
+    color: #3c434a;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    vertical-align: middle;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.acf-bb-token-chip:hover {
+    background: #e7f3ff;
+    border-color: #2271b1;
+    color: #2271b1;
+}
+
+.acf-bb-token-chip:active {
+    background: #d4e9ff;
+    transform: scale(0.98);
+}
+
+.acf-bb-token-chip .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    line-height: 14px;
+    color: #8c8f94;
+    transition: color 0.15s ease;
+}
+
+.acf-bb-token-chip:hover .dashicons {
+    color: #2271b1;
+}
+
+.acf-bb-token-label {
+    line-height: 1.2;
+}
+
+/* Token chips inside summary widget */
+.acf-bb-summary-list .acf-bb-token-chip {
+    margin: 0 1px;
+}
+
+/* Token chips inside message content */
+.acf-bb-message-content .acf-bb-token-chip {
+    margin: 0 3px;
+}
+
+/* Error token chips in messages */
+.acf-bb-error-token-chip {
+    background: linear-gradient(135deg, #fce8e8 0%, #fcf0f0 100%);
+    border-color: #d63638;
+    color: #8a1c1c;
+    cursor: help;
+    position: relative;
+}
+
+.acf-bb-error-token-chip:hover {
+    background: linear-gradient(135deg, #fad5d5 0%, #fce8e8 100%);
+    border-color: #b32d2e;
+    color: #6b1515;
+}
+
+.acf-bb-error-token-chip .dashicons {
+    color: #d63638;
+}
+
+.acf-bb-error-token-chip:hover .dashicons {
+    color: #b32d2e;
+}
+
+/* Custom Error Tooltip Popover */
+.acf-bb-error-popover {
+    position: fixed;
+    z-index: 100001;
+    background: #1d2327;
+    color: #fff;
+    padding: 14px 18px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    max-width: 450px;
+    min-width: 280px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.acf-bb-error-popover.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.acf-bb-error-popover::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #1d2327;
+    border-bottom: none;
+}
+
+.acf-bb-error-popover.below::after {
+    bottom: auto;
+    top: -6px;
+    border-top-color: transparent;
+    border-bottom-color: #1d2327;
+    border-top: none;
+    border-bottom: 6px solid #1d2327;
+}
+
+.acf-bb-error-popover-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    color: #f0b849;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.acf-bb-error-popover-title .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.acf-bb-error-popover-file {
+    color: #93c5fd;
+    font-weight: 600;
+    margin-top: 8px;
+    margin-bottom: 4px;
+}
+
+.acf-bb-error-popover-file:first-child {
+    margin-top: 0;
+}
+
+.acf-bb-error-popover-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.acf-bb-error-popover-list li {
+    position: relative;
+    padding-left: 16px;
+    margin-bottom: 4px;
+    color: #e2e8f0;
+}
+
+.acf-bb-error-popover-list li::before {
+    content: '•';
+    position: absolute;
+    left: 4px;
+    color: #d63638;
+}
+
+.acf-bb-error-popover-list li:last-child {
+    margin-bottom: 0;
+}
+
+.acf-bb-error-popover-line {
+    color: #a78bfa;
+    font-weight: 500;
+}
+
+/* Tab highlight animation when navigating from token */
+.acf-bb-tab.acf-bb-tab-highlight {
+    animation: acf-bb-tab-pulse 0.5s ease-out;
+}
+
+@keyframes acf-bb-tab-pulse {
+    0% {
+        background-color: #e7f3ff;
+        box-shadow: 0 0 0 2px rgba(34, 113, 177, 0.3);
+    }
+    100% {
+        background-color: transparent;
+        box-shadow: none;
+    }
+}
+
+/* Dark theme variant for tokens inside code widgets */
+.acf-bb-code-widget .acf-bb-token-chip,
+.acf-bb-summary-widget .acf-bb-token-chip {
+    background: #e8f4fc;
+    border-color: #b8daef;
+}
+
+.acf-bb-code-widget .acf-bb-token-chip:hover,
+.acf-bb-summary-widget .acf-bb-token-chip:hover {
+    background: #d4e9ff;
+    border-color: #2271b1;
+}
+
+/* ==========================================
+   MENTION AUTOCOMPLETE - @ Dropdown & Chips
+   ========================================== */
+
+/* Mention Dropdown */
+.acf-bb-mention-dropdown {
+    display: none;
+    position: absolute;
+    z-index: 100000;
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+}
+
+.acf-bb-mention-dropdown.visible {
+    display: block;
+}
+
+.acf-bb-mention-header {
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #8c8f94;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.acf-bb-mention-list {
+    padding: 4px;
+}
+
+.acf-bb-mention-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.1s ease;
+    color: #1d2327;
+}
+
+.acf-bb-mention-item:hover,
+.acf-bb-mention-item.selected {
+    background: #f0f6fc;
+}
+
+.acf-bb-mention-item.selected {
+    background: #e7f3ff;
+}
+
+.acf-bb-mention-item.attached {
+    opacity: 0.6;
+}
+
+.acf-bb-mention-item .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: #8c8f94;
+}
+
+.acf-bb-mention-item.selected .dashicons,
+.acf-bb-mention-item:hover .dashicons {
+    color: #2271b1;
+}
+
+.acf-bb-mention-label {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.acf-bb-mention-label strong {
+    color: #2271b1;
+    font-weight: 600;
+}
+
+.acf-bb-mention-attached {
+    color: #00a32a;
+}
+
+.acf-bb-mention-attached .dashicons {
+    color: #00a32a;
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.acf-bb-mention-empty {
+    padding: 20px;
+    text-align: center;
+    color: #8c8f94;
+    font-size: 13px;
+}
+
+/* Category Overview (when no search) */
+.acf-bb-mention-category {
+    padding: 8px 4px;
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.acf-bb-mention-category:last-child {
+    border-bottom: none;
+}
+
+.acf-bb-mention-category-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    color: #1d2327;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.acf-bb-mention-category-header .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: #646970;
+}
+
+.acf-bb-mention-category-title {
+    flex: 1;
+}
+
+.acf-bb-mention-category-count {
+    font-size: 12px;
+    color: #8c8f94;
+    font-weight: 500;
+}
+
+.acf-bb-mention-more {
+    padding: 6px 12px 6px 40px;
+    font-size: 12px;
+    color: #8c8f94;
+    font-style: italic;
+}
+
+/* Search Bar */
+.acf-bb-mention-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.acf-bb-mention-search .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: #9ca3af;
+    flex-shrink: 0;
+}
+
+.acf-bb-mention-search-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    color: #1d2327;
+    outline: none;
+    padding: 4px 0;
+    min-width: 0;
+}
+
+.acf-bb-mention-search-input::placeholder {
+    color: #9ca3af;
+}
+
+.acf-bb-mention-search-input:focus {
+    outline: none;
+}
+
+/* Folder Items (Field Groups, Fields) */
+.acf-bb-mention-folder {
+    margin: 4px;
+    border: 1px solid transparent;
+}
+
+.acf-bb-mention-folder:hover,
+.acf-bb-mention-folder.selected {
+    border-color: #e5e7eb;
+    background: #f0f6fc;
+}
+
+.acf-bb-mention-folder-count {
+    font-size: 12px;
+    color: #8c8f94;
+    font-weight: 500;
+    margin-left: auto;
+}
+
+.acf-bb-folder-arrow {
+    font-size: 16px !important;
+    width: 16px !important;
+    height: 16px !important;
+    color: #9ca3af !important;
+    margin-left: 4px;
+    transition: transform 0.15s ease;
+}
+
+.acf-bb-mention-folder:hover .acf-bb-folder-arrow,
+.acf-bb-mention-folder.selected .acf-bb-folder-arrow {
+    color: #2271b1 !important;
+    transform: translateX(2px);
+}
+
+/* Back Button */
+.acf-bb-mention-back {
+    margin: 4px;
+    border-bottom: 1px solid #e5e7eb;
+    border-radius: 6px 6px 0 0;
+    color: #6b7280;
+}
+
+.acf-bb-mention-back .dashicons {
+    transition: transform 0.15s ease;
+}
+
+.acf-bb-mention-back:hover .dashicons,
+.acf-bb-mention-back.selected .dashicons {
+    transform: translateX(-2px);
+}
+
+/* Contenteditable Prompt Editor */
+.acf-bb-prompt-editor {
+    flex: 1;
+    min-height: 24px;
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 6px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #1d2327;
+    outline: none;
+    word-wrap: break-word;
+}
+
+.acf-bb-prompt-editor:empty:before {
+    content: attr(data-placeholder);
+    color: #9ca3af;
+    pointer-events: none;
+}
+
+.acf-bb-prompt-editor:focus:empty:before {
+    color: #b0b5ba;
+}
+
+/* Hide original textarea when using contenteditable */
+.acf-bb-textarea-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+/* Inline Chips */
+.acf-bb-inline-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 4px 2px 8px;
+    margin: 0 2px;
+    background: linear-gradient(135deg, #e8f4fc 0%, #f0f6fc 100%);
+    border: 1px solid #b8daef;
+    border-radius: 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #1e4a6d;
+    cursor: pointer;
+    vertical-align: middle;
+    user-select: none;
+    transition: all 0.15s ease;
+}
+
+.acf-bb-inline-chip:hover {
+    background: linear-gradient(135deg, #d4e9ff 0%, #e7f3ff 100%);
+    border-color: #2271b1;
+}
+
+.acf-bb-inline-chip .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    color: #2271b1;
+    line-height: 14px;
+}
+
+.acf-bb-inline-chip-label {
+    line-height: 1.2;
+}
+
+.acf-bb-inline-chip-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #8c8f94;
+    transition: all 0.15s ease;
+    vertical-align: middle;
+}
+
+.acf-bb-inline-chip-remove:hover {
+    background: rgba(214, 54, 56, 0.15);
+    color: #d63638;
+}
+
+.acf-bb-inline-chip-remove .dashicons {
+    font-size: 10px;
+    width: 10px;
+    height: 10px;
+    line-height: 10px;
+    color: inherit;
+}
+
+/* Error Chip Styles */
+.acf-bb-error-chip {
+    background: linear-gradient(135deg, #fce8e8 0%, #fcf0f0 100%);
+    border-color: #d63638;
+    color: #8a1c1c;
+    position: relative;
+}
+
+.acf-bb-error-chip:hover {
+    background: linear-gradient(135deg, #fad5d5 0%, #fce8e8 100%);
+    border-color: #b32d2e;
+}
+
+.acf-bb-error-chip .dashicons {
+    color: #d63638;
+}
+
+/* Error Chip Tooltip */
+.acf-bb-error-chip::before,
+.acf-bb-error-chip::after {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 10000;
+}
+
+.acf-bb-error-chip::before {
+    content: attr(data-tooltip);
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) translateY(5px);
+    background: #1d2327;
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    max-width: 400px;
+    min-width: 250px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    text-align: left;
+}
+
+.acf-bb-error-chip::after {
+    content: '';
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%) translateY(5px);
+    border: 6px solid transparent;
+    border-top-color: #1d2327;
+}
+
+.acf-bb-error-chip:hover::before,
+.acf-bb-error-chip:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
 }
