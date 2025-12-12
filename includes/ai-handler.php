@@ -302,6 +302,17 @@ class ACF_Block_Builder_AI {
 		- Verify complex fields (Link, Image) are arrays using !empty() && is_array().
 		- Initialize variables.
 		
+		JAVASCRIPT/TYPESCRIPT BEST PRACTICES:
+		- When writing JavaScript code that uses WordPress/ACF/jQuery globals, use @ts-ignore comments to suppress TypeScript linting errors.
+		- Place // @ts-ignore on the line immediately before code that accesses globals like window.acf, window.jQuery, or jQuery.
+		- Example:
+		  // @ts-ignore - ACF adds the acf object to window
+		  if (typeof window.acf !== 'undefined') {
+		    // @ts-ignore
+		    window.acf.addAction('render_block_preview', initializeBlock);
+		  }
+		- Use @ts-ignore sparingly - only when accessing known WordPress/plugin globals that TypeScript can't verify.
+		
 		REFERENCES:
 		1. block.json: $ref_block_json
 		2. script.js: $ref_script_js

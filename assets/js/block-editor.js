@@ -807,6 +807,169 @@ jQuery(document).ready(function($) {
     require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }});
 
     require(['vs/editor/editor.main'], function() {
+        // =====================================================
+        // Configure Monaco Diagnostics for JSON, CSS, and JS
+        // =====================================================
+        
+        // JSON validation
+        monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+            validate: true,
+            allowComments: false,
+            schemaValidation: 'error',
+            enableSchemaRequest: false
+        });
+        
+        // CSS validation with linting rules
+        monaco.languages.css.cssDefaults.setOptions({
+            validate: true,
+            lint: {
+                compatibleVendorPrefixes: 'warning',
+                vendorPrefix: 'warning',
+                duplicateProperties: 'warning',
+                emptyRules: 'warning',
+                importStatement: 'ignore',
+                fontFaceProperties: 'warning',
+                hexColorLength: 'warning',
+                unknownProperties: 'warning',
+                propertyIgnoredDueToDisplay: 'warning',
+                ieHack: 'warning',
+                zeroUnits: 'warning',
+                argumentsInColorFunction: 'error',
+                unknownAtRules: 'warning'
+            }
+        });
+        
+        // JavaScript validation
+        monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+            noSemanticValidation: false,
+            noSyntaxValidation: false
+        });
+        
+        monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+            target: monaco.languages.typescript.ScriptTarget.ES2020,
+            allowNonTsExtensions: true,
+            checkJs: true,
+            allowJs: true,
+            noEmit: true,
+            noImplicitAny: false,
+            strictNullChecks: false,
+            suppressImplicitAnyIndexErrors: true
+        });
+        
+        // Add global type declarations for WordPress/jQuery/ACF
+        monaco.languages.typescript.javascriptDefaults.addExtraLib(`
+            declare var jQuery: any;
+            declare var $: any;
+            declare var acf: any;
+            declare var wp: any;
+            declare interface Window {
+                acf: any;
+                jQuery: any;
+                wp: any;
+            }
+        `, 'ts:globals.d.ts');
+        
+        // =====================================================
+        // PHP Linting with php-parser.js
+        // =====================================================
+        
+        var phpParser = null;
+        
+        // Lazy initialization - get or create parser instance
+        function getPhpParser() {
+            if (phpParser) return phpParser;
+            
+            // Check for PhpParser in various locations
+            var PhpParserRef = window.PhpParser || window.phpParser || window.PHP_PARSER || 
+                               (typeof PhpParser !== 'undefined' ? PhpParser : null);
+            
+            if (!PhpParserRef) return null;
+            
+            try {
+                if (typeof PhpParserRef.Engine === 'function') {
+                    phpParser = new PhpParserRef.Engine({
+                        parser: { extractDoc: true, php7: true, suppressErrors: false },
+                        ast: { withPositions: true }
+                    });
+                } else if (typeof PhpParserRef === 'function') {
+                    phpParser = new PhpParserRef({
+                        parser: { extractDoc: true, php7: true, suppressErrors: false },
+                        ast: { withPositions: true }
+                    });
+                }
+            } catch (e) {
+                console.error('PHP Parser init error:', e);
+            }
+            
+            return phpParser;
+        }
+        
+        // Debounce helper
+        function debounce(func, wait) {
+            var timeout;
+            return function() {
+                var context = this, args = arguments;
+                clearTimeout(timeout);
+                timeout = setTimeout(function() {
+                    func.apply(context, args);
+                }, wait);
+            };
+        }
+        
+        // PHP lint function
+        function lintPHP(editor, editorKey) {
+            var parser = getPhpParser();
+            if (!parser) return;
+            
+            var code = editor.getValue();
+            var model = editor.getModel();
+            
+            // Clear existing markers
+            monaco.editor.setModelMarkers(model, 'php-lint', []);
+            
+            // Skip empty content
+            if (!code.trim()) return;
+            
+            try {
+                if (parser.parseCode) {
+                    parser.parseCode(code, editorKey + '.php');
+                } else if (parser.parseEval) {
+                    parser.parseEval(code);
+                }
+                // No errors - markers already cleared
+            } catch (e) {
+                var lineNumber = 1;
+                var column = 1;
+                var message = e.message || 'PHP syntax error';
+                
+                // Try to extract line number from error
+                if (e.lineNumber) {
+                    lineNumber = e.lineNumber;
+                } else if (e.loc && e.loc.start) {
+                    lineNumber = e.loc.start.line;
+                    column = e.loc.start.column || 1;
+                } else {
+                    // Try to parse from message like "Parse Error: ... on line 5"
+                    var lineMatch = message.match(/line\s*(\d+)/i);
+                    if (lineMatch) {
+                        lineNumber = parseInt(lineMatch[1], 10);
+                    }
+                }
+                
+                var markers = [{
+                    severity: monaco.MarkerSeverity.Error,
+                    startLineNumber: lineNumber,
+                    startColumn: column,
+                    endLineNumber: lineNumber,
+                    endColumn: 1000,
+                    message: message,
+                    source: 'php-parser'
+                }];
+                
+                monaco.editor.setModelMarkers(model, 'php-lint', markers);
+            }
+        }
+        
         // Initialize editors
         editors['block-json'] = monaco.editor.create(document.getElementById('editor-block-json'), {
             value: $('#textarea-block-json').val(),
@@ -857,6 +1020,419 @@ jQuery(document).ready(function($) {
         editors['script-js'].onDidChangeModelContent(function() { $('#textarea-script-js').val(editors['script-js'].getValue()); });
         editors['fields-php'].onDidChangeModelContent(function() { $('#textarea-fields-php').val(editors['fields-php'].getValue()); });
         editors['assets-php'].onDidChangeModelContent(function() { $('#textarea-assets-php').val(editors['assets-php'].getValue()); });
+        
+        // Setup debounced PHP linting for PHP editors
+        var debouncedLintRenderPHP = debounce(function() { lintPHP(editors['render-php'], 'render-php'); }, 500);
+        var debouncedLintFieldsPHP = debounce(function() { lintPHP(editors['fields-php'], 'fields-php'); }, 500);
+        var debouncedLintAssetsPHP = debounce(function() { lintPHP(editors['assets-php'], 'assets-php'); }, 500);
+        
+        editors['render-php'].onDidChangeModelContent(debouncedLintRenderPHP);
+        editors['fields-php'].onDidChangeModelContent(debouncedLintFieldsPHP);
+        editors['assets-php'].onDidChangeModelContent(debouncedLintAssetsPHP);
+        
+        // Run initial PHP lint on all PHP editors
+        setTimeout(function() {
+            lintPHP(editors['render-php'], 'render-php');
+            lintPHP(editors['fields-php'], 'fields-php');
+            lintPHP(editors['assets-php'], 'assets-php');
+        }, 500);
+        
+        // =====================================================
+        // Lint Badge UI - Track and display errors/warnings
+        // =====================================================
+        
+        // Update lint badge for a specific tab
+        function updateLintBadge(tabId) {
+            var editor = editors[tabId];
+            if (!editor) return;
+            
+            var model = editor.getModel();
+            if (!model) return;
+            
+            var markers = monaco.editor.getModelMarkers({ resource: model.uri });
+            var errors = 0;
+            var warnings = 0;
+            
+            markers.forEach(function(marker) {
+                if (marker.severity === monaco.MarkerSeverity.Error) {
+                    errors++;
+                } else if (marker.severity === monaco.MarkerSeverity.Warning) {
+                    warnings++;
+                }
+            });
+            
+            var $badge = $('.acf-bb-lint-badge[data-lint-tab="' + tabId + '"]');
+            var $tab = $badge.closest('.acf-bb-tab');
+            
+            // Reset classes
+            $badge.removeClass('has-errors has-warnings');
+            $tab.removeClass('has-lint-errors');
+            
+            if (errors > 0) {
+                $badge.addClass('has-errors').text(errors);
+                $tab.addClass('has-lint-errors');
+            } else if (warnings > 0) {
+                $badge.addClass('has-warnings').text(warnings);
+            } else {
+                $badge.text('');
+            }
+        }
+        
+        // Update all lint badges
+        function updateAllLintBadges() {
+            Object.keys(editors).forEach(function(tabId) {
+                updateLintBadge(tabId);
+            });
+        }
+        
+        // Listen for marker changes on all editor models
+        monaco.editor.onDidChangeMarkers(function(uris) {
+            uris.forEach(function(uri) {
+                // Find which editor this URI belongs to
+                Object.keys(editors).forEach(function(tabId) {
+                    var editor = editors[tabId];
+                    if (editor && editor.getModel() && editor.getModel().uri.toString() === uri.toString()) {
+                        updateLintBadge(tabId);
+                    }
+                });
+            });
+        });
+        
+        // Initial badge update after a short delay (wait for Monaco diagnostics)
+        setTimeout(function() {
+            updateAllLintBadges();
+            updateProblemsPanel();
+        }, 1500);
+        
+        // =====================================================
+        // Problems Panel - Grouped error display with AI fix
+        // =====================================================
+        
+        var fileNameMap = {
+            'block-json': 'block.json',
+            'render-php': 'render.php',
+            'style-css': 'style.css',
+            'script-js': 'script.js',
+            'fields-php': 'fields.php',
+            'assets-php': 'assets.php'
+        };
+        
+        var fileIconMap = {
+            'block-json': 'dashicons-media-code',
+            'render-php': 'dashicons-editor-code',
+            'style-css': 'dashicons-art',
+            'script-js': 'dashicons-media-default',
+            'fields-php': 'dashicons-database',
+            'assets-php': 'dashicons-admin-links'
+        };
+        
+        // =====================================================
+        // Ignored Errors Management
+        // =====================================================
+        
+        // Load ignored errors from hidden field
+        var ignoredErrors = [];
+        try {
+            var ignoredJson = $('#acf-bb-ignored-errors').val();
+            if (ignoredJson) {
+                ignoredErrors = JSON.parse(ignoredJson);
+            }
+        } catch (e) {
+            console.error('Error parsing ignored errors:', e);
+            ignoredErrors = [];
+        }
+        
+        // Create error signature for matching
+        function getErrorSignature(tabId, line, message) {
+            return tabId + ':' + line + ':' + message.substring(0, 100);
+        }
+        
+        // Check if error is ignored
+        function isErrorIgnored(tabId, line, message) {
+            var signature = getErrorSignature(tabId, line, message);
+            return ignoredErrors.some(function(ignored) {
+                return ignored.signature === signature;
+            });
+        }
+        
+        // Add error to ignored list
+        function ignoreError(tabId, line, message) {
+            var signature = getErrorSignature(tabId, line, message);
+            
+            // Check if already ignored
+            if (isErrorIgnored(tabId, line, message)) return;
+            
+            ignoredErrors.push({
+                signature: signature,
+                tabId: tabId,
+                line: line,
+                message: message,
+                timestamp: Date.now()
+            });
+            
+            saveIgnoredErrors();
+            updateProblemsPanel();
+        }
+        
+        // Remove error from ignored list
+        function restoreError(signature) {
+            ignoredErrors = ignoredErrors.filter(function(err) {
+                return err.signature !== signature;
+            });
+            
+            saveIgnoredErrors();
+            updateProblemsPanel();
+        }
+        
+        // Clear all ignored errors
+        function clearAllIgnored() {
+            if (!confirm('Clear all ignored errors?')) return;
+            
+            ignoredErrors = [];
+            saveIgnoredErrors();
+            updateProblemsPanel();
+        }
+        
+        // Save ignored errors to hidden field
+        function saveIgnoredErrors() {
+            $('#acf-bb-ignored-errors').val(JSON.stringify(ignoredErrors));
+        }
+        
+        // Collect all problems from all editors
+        function collectAllProblems() {
+            var problems = {};
+            var ignoredProblems = {};
+            var totalErrors = 0;
+            var totalWarnings = 0;
+            
+            Object.keys(editors).forEach(function(tabId) {
+                var editor = editors[tabId];
+                if (!editor) return;
+                
+                var model = editor.getModel();
+                if (!model) return;
+                
+                var markers = monaco.editor.getModelMarkers({ resource: model.uri });
+                if (markers.length > 0) {
+                    markers.forEach(function(marker) {
+                        var isError = marker.severity === monaco.MarkerSeverity.Error;
+                        var message = marker.message;
+                        var line = marker.startLineNumber;
+                        
+                        var problemData = {
+                            severity: isError ? 'error' : 'warning',
+                            message: message,
+                            line: line,
+                            column: marker.startColumn,
+                            source: marker.source || ''
+                        };
+                        
+                        // Check if ignored
+                        if (isErrorIgnored(tabId, line, message)) {
+                            if (!ignoredProblems[tabId]) ignoredProblems[tabId] = [];
+                            ignoredProblems[tabId].push(problemData);
+                        } else {
+                            if (!problems[tabId]) problems[tabId] = [];
+                            problems[tabId].push(problemData);
+                            
+                            if (isError) totalErrors++;
+                            else totalWarnings++;
+                        }
+                    });
+                }
+            });
+            
+            return {
+                problems: problems,
+                ignoredProblems: ignoredProblems,
+                totalErrors: totalErrors,
+                totalWarnings: totalWarnings,
+                total: totalErrors + totalWarnings,
+                totalIgnored: ignoredErrors.length
+            };
+        }
+        
+        // Update the problems panel UI
+        function updateProblemsPanel() {
+            var data = collectAllProblems();
+            var $panel = $('#acf-bb-problems-panel');
+            var $count = $('#acf-bb-problems-count');
+            var $list = $('#acf-bb-problems-list');
+            var $fixBtn = $('#acf-bb-fix-with-ai');
+            var $ignoredCount = $('.acf-bb-ignored-count');
+            var $ignoredSection = $('#acf-bb-ignored-problems');
+            var $ignoredList = $('#acf-bb-ignored-list');
+            
+            // Update counts
+            $count.text(data.total);
+            $ignoredCount.text(data.totalIgnored);
+            
+            // Update panel state
+            $panel.removeClass('has-errors has-warnings');
+            if (data.totalErrors > 0) {
+                $panel.addClass('has-errors');
+            } else if (data.totalWarnings > 0) {
+                $panel.addClass('has-warnings');
+            }
+            
+            // Enable/disable fix button
+            $fixBtn.prop('disabled', data.total === 0);
+            
+            // Build problems list HTML with ignore buttons
+            var html = '';
+            Object.keys(data.problems).forEach(function(tabId) {
+                var fileName = fileNameMap[tabId] || tabId;
+                var iconClass = fileIconMap[tabId] || 'dashicons-media-code';
+                var fileProblems = data.problems[tabId];
+                
+                html += '<div class="acf-bb-problems-group" data-tab="' + tabId + '">';
+                html += '<div class="acf-bb-problems-file"><span class="dashicons ' + iconClass + '"></span>' + fileName + ' (' + fileProblems.length + ')</div>';
+                
+                fileProblems.forEach(function(problem) {
+                    var signature = getErrorSignature(tabId, problem.line, problem.message);
+                    html += '<div class="acf-bb-problem-item" data-tab="' + tabId + '" data-line="' + problem.line + '" data-col="' + problem.column + '">';
+                    html += '<span class="acf-bb-problem-icon ' + problem.severity + '">';
+                    html += problem.severity === 'error' ? '⊗' : '⚠';
+                    html += '</span>';
+                    html += '<span class="acf-bb-problem-message">' + escapeHtml(problem.message) + '</span>';
+                    html += '<span class="acf-bb-problem-location">[Ln ' + problem.line + ', Col ' + problem.column + ']</span>';
+                    html += '<span class="acf-bb-problem-actions">';
+                    html += '<button class="acf-bb-problem-ignore" data-signature="' + signature + '" data-tab="' + tabId + '" data-line="' + problem.line + '" data-message="' + escapeHtml(problem.message) + '">Ignore</button>';
+                    html += '</span>';
+                    html += '</div>';
+                });
+                
+                html += '</div>';
+            });
+            
+            $list.html(html);
+            
+            // Build ignored problems list
+            if (data.totalIgnored > 0 && $('#acf-bb-show-ignored').hasClass('active')) {
+                var ignoredHtml = '';
+                Object.keys(data.ignoredProblems).forEach(function(tabId) {
+                    var fileName = fileNameMap[tabId] || tabId;
+                    var iconClass = fileIconMap[tabId] || 'dashicons-media-code';
+                    var fileProblems = data.ignoredProblems[tabId];
+                    
+                    ignoredHtml += '<div class="acf-bb-problems-group" data-tab="' + tabId + '">';
+                    ignoredHtml += '<div class="acf-bb-problems-file"><span class="dashicons ' + iconClass + '"></span>' + fileName + ' (' + fileProblems.length + ')</div>';
+                    
+                    fileProblems.forEach(function(problem) {
+                        var signature = getErrorSignature(tabId, problem.line, problem.message);
+                        ignoredHtml += '<div class="acf-bb-problem-item" data-tab="' + tabId + '" data-line="' + problem.line + '" data-col="' + problem.column + '">';
+                        ignoredHtml += '<span class="acf-bb-problem-icon ' + problem.severity + '">';
+                        ignoredHtml += problem.severity === 'error' ? '⊗' : '⚠';
+                        ignoredHtml += '</span>';
+                        ignoredHtml += '<span class="acf-bb-problem-message">' + escapeHtml(problem.message) + '</span>';
+                        ignoredHtml += '<span class="acf-bb-problem-location">[Ln ' + problem.line + ', Col ' + problem.column + ']</span>';
+                        ignoredHtml += '<span class="acf-bb-problem-actions">';
+                        ignoredHtml += '<button class="acf-bb-problem-restore" data-signature="' + signature + '">Restore</button>';
+                        ignoredHtml += '</span>';
+                        ignoredHtml += '</div>';
+                    });
+                    
+                    ignoredHtml += '</div>';
+                });
+                
+                $ignoredList.html(ignoredHtml);
+                $ignoredSection.show();
+            } else {
+                $ignoredSection.hide();
+            }
+        }
+        
+        // Helper to escape HTML
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Click on problem to jump to line
+        $(document).on('click', '.acf-bb-problem-item', function() {
+            var tabId = $(this).data('tab');
+            var line = $(this).data('line');
+            var col = $(this).data('col');
+            
+            // Switch to tab
+            $('.acf-bb-tab[data-tab="' + tabId + '"]').click();
+            
+            // Jump to line in editor
+            setTimeout(function() {
+                var editor = editors[tabId];
+                if (editor) {
+                    editor.revealLineInCenter(line);
+                    editor.setPosition({ lineNumber: line, column: col });
+                    editor.focus();
+                }
+            }, 100);
+        });
+        
+        // Toggle problems panel
+        $('#acf-bb-problems-toggle').on('click', function() {
+            $('#acf-bb-problems-panel').toggleClass('collapsed');
+        });
+        
+        // Event handlers for ignore/restore
+        $(document).on('click', '.acf-bb-problem-ignore', function(e) {
+            e.stopPropagation();
+            var tabId = $(this).data('tab');
+            var line = $(this).data('line');
+            var message = $(this).data('message');
+            ignoreError(tabId, line, message);
+        });
+        
+        $(document).on('click', '.acf-bb-problem-restore', function(e) {
+            e.stopPropagation();
+            var signature = $(this).data('signature');
+            restoreError(signature);
+        });
+        
+        $('#acf-bb-show-ignored').on('click', function() {
+            $(this).toggleClass('active');
+            updateProblemsPanel();
+        });
+        
+        $('#acf-bb-clear-ignored').on('click', clearAllIgnored);
+        
+        // Fix with AI button
+        $('#acf-bb-fix-with-ai').on('click', function() {
+            var data = collectAllProblems();
+            if (data.total === 0) return;
+            
+            // Build AI prompt with all errors
+            var prompt = 'Please fix the following code errors:\n\n';
+            
+            Object.keys(data.problems).forEach(function(tabId) {
+                var fileName = fileNameMap[tabId] || tabId;
+                var fileProblems = data.problems[tabId];
+                
+                prompt += '**' + fileName + ':**\n';
+                fileProblems.forEach(function(problem) {
+                    prompt += '- Line ' + problem.line + ': ' + problem.message + '\n';
+                });
+                prompt += '\n';
+            });
+            
+            prompt += 'Please analyze these errors and provide the corrected code.';
+            
+            // Set the prompt in the chat input
+            var $textarea = $('#acf_block_builder_prompt');
+            $textarea.val(prompt);
+            $textarea.trigger('input'); // Trigger resize and enable send button
+            
+            // Scroll to chat and focus
+            $textarea.focus();
+            
+            // Optionally scroll the chat section into view
+            $('.ai-chat-section')[0]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+        
+        // Update problems panel when markers change
+        monaco.editor.onDidChangeMarkers(function() {
+            updateProblemsPanel();
+        });
 
         // --- Diff View Functions (Inside require to access monaco) ---
         window.updateDiffEditor = function(tabId) {

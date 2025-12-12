@@ -220,15 +220,6 @@ class ACF_Block_Builder_Meta_Boxes {
 				<p class="description" style="margin-top: 10px;">
 					<?php _e( 'Copy block files directly to the active theme\'s "blocks" directory.', 'acf-block-builder' ); ?>
 				</p>
-				
-				<hr style="margin: 20px 0; border: 0; border-top: 1px solid #dcdcde;" />
-				
-				<button type="button" id="acf-bb-clear-history" class="button button-secondary button-large" style="width: 100%; justify-content: center; display: flex; align-items: center; gap: 5px; color: #b32d2e;">
-					<span class="dashicons dashicons-trash"></span> <?php _e( 'Clear Chat History', 'acf-block-builder' ); ?>
-				</button>
-				<p class="description" style="margin-top: 10px;">
-					<?php _e( 'Remove all messages from the AI chat.', 'acf-block-builder' ); ?>
-				</p>
 			<?php else : ?>
 				<p><?php _e( 'Save the post to enable export.', 'acf-block-builder' ); ?></p>
 			<?php endif; ?>
@@ -497,21 +488,27 @@ class ACF_Block_Builder_Meta_Boxes {
 				<div class="acf-bb-tabs">
 					<a href="#" class="acf-bb-tab active" data-tab="block-json" data-file-type="json">
 						<span class="dashicons dashicons-media-code"></span> block.json
+						<span class="acf-bb-lint-badge" data-lint-tab="block-json"></span>
 					</a>
 					<a href="#" class="acf-bb-tab" data-tab="render-php" data-file-type="php">
 						<span class="dashicons dashicons-editor-code"></span> render.php
+						<span class="acf-bb-lint-badge" data-lint-tab="render-php"></span>
 					</a>
 					<a href="#" class="acf-bb-tab" data-tab="style-css" data-file-type="css">
 						<span class="dashicons dashicons-art"></span> style.css
+						<span class="acf-bb-lint-badge" data-lint-tab="style-css"></span>
 					</a>
 					<a href="#" class="acf-bb-tab" data-tab="script-js" data-file-type="js">
 						<span class="dashicons dashicons-media-default"></span> script.js
+						<span class="acf-bb-lint-badge" data-lint-tab="script-js"></span>
 					</a>
 					<a href="#" class="acf-bb-tab" data-tab="fields-php" data-file-type="fields">
 						<span class="dashicons dashicons-database"></span> fields.php
+						<span class="acf-bb-lint-badge" data-lint-tab="fields-php"></span>
 					</a>
 					<a href="#" class="acf-bb-tab" data-tab="assets-php" data-file-type="assets">
 						<span class="dashicons dashicons-admin-links"></span> assets.php
+						<span class="acf-bb-lint-badge" data-lint-tab="assets-php"></span>
 					</a>
 					<button type="button" class="acf-bb-history-btn" id="acf-bb-open-history" title="<?php esc_attr_e( 'View Version History', 'acf-block-builder' ); ?>">
 						<span class="dashicons dashicons-backup"></span>
@@ -549,6 +546,50 @@ class ACF_Block_Builder_Meta_Boxes {
 						<textarea name="acf_block_builder_assets" id="textarea-assets-php" class="hidden-textarea"><?php echo esc_textarea( $assets_php ); ?></textarea>
 					</div>
 				</div>
+				
+				<!-- Problems Panel -->
+				<div class="acf-bb-problems-panel" id="acf-bb-problems-panel">
+					<div class="acf-bb-problems-header">
+						<button type="button" class="acf-bb-problems-toggle" id="acf-bb-problems-toggle">
+							<span class="dashicons dashicons-warning"></span>
+							<span class="acf-bb-problems-title"><?php esc_html_e( 'Problems', 'acf-block-builder' ); ?></span>
+							<span class="acf-bb-problems-count" id="acf-bb-problems-count">0</span>
+							<span class="dashicons dashicons-arrow-up-alt2 acf-bb-toggle-icon"></span>
+						</button>
+						<div class="acf-bb-problems-actions">
+							<button type="button" class="acf-bb-show-ignored" id="acf-bb-show-ignored" title="<?php esc_attr_e( 'Show ignored problems', 'acf-block-builder' ); ?>">
+								<span class="dashicons dashicons-hidden"></span>
+								<span class="acf-bb-ignored-count">0</span>
+							</button>
+							<button type="button" class="acf-bb-fix-with-ai" id="acf-bb-fix-with-ai" disabled title="<?php esc_attr_e( 'Send errors to AI for help', 'acf-block-builder' ); ?>">
+								<span class="dashicons dashicons-superhero"></span>
+								<?php esc_html_e( 'Fix with AI', 'acf-block-builder' ); ?>
+							</button>
+						</div>
+					</div>
+					<div class="acf-bb-problems-content" id="acf-bb-problems-content">
+						<div class="acf-bb-problems-empty">
+							<span class="dashicons dashicons-yes-alt"></span>
+							<?php esc_html_e( 'No problems detected', 'acf-block-builder' ); ?>
+						</div>
+						<div class="acf-bb-problems-list" id="acf-bb-problems-list"></div>
+						
+						<!-- Ignored Problems Section -->
+						<div class="acf-bb-ignored-problems" id="acf-bb-ignored-problems" style="display: none;">
+							<div class="acf-bb-ignored-header">
+								<span class="dashicons dashicons-hidden"></span>
+								<?php esc_html_e( 'Ignored Problems', 'acf-block-builder' ); ?>
+								<button type="button" class="acf-bb-clear-ignored" id="acf-bb-clear-ignored">
+									<?php esc_html_e( 'Clear All', 'acf-block-builder' ); ?>
+								</button>
+							</div>
+							<div class="acf-bb-ignored-list" id="acf-bb-ignored-list"></div>
+						</div>
+					</div>
+				</div>
+				
+				<!-- Hidden field to store ignored errors -->
+				<input type="hidden" name="acf_block_builder_ignored_errors" id="acf-bb-ignored-errors" value="<?php echo esc_attr( get_post_meta( $post->ID, '_acf_block_builder_ignored_errors', true ) ); ?>" />
 			</div>
 			
 			<!-- Version History Overlay -->
@@ -666,6 +707,11 @@ class ACF_Block_Builder_Meta_Boxes {
 			if ( isset( $_POST[ $field ] ) ) {
 				update_post_meta( $post_id, '_' . $field, $_POST[ $field ] );
 			}
+		}
+		
+		// Save ignored errors
+		if ( isset( $_POST['acf_block_builder_ignored_errors'] ) ) {
+			update_post_meta( $post_id, '_acf_block_builder_ignored_errors', sanitize_textarea_field( $_POST['acf_block_builder_ignored_errors'] ) );
 		}
 
 		// Trigger file generation
@@ -1063,11 +1109,25 @@ class ACF_Block_Builder_Meta_Boxes {
 
 		if ( $hook == 'post-new.php' || $hook == 'post.php' ) {
 			if ( 'acf_block_builder' === $post->post_type ) {
+				// PHP Parser for client-side PHP linting - MUST load BEFORE Monaco's AMD loader
+				// Otherwise the AMD loader hijacks php-parser and it won't register as a global
+				wp_enqueue_script( 'php-parser', 'https://cdn.jsdelivr.net/npm/php-parser@3.2.5/dist/php-parser.min.js', array( 'jquery' ), '3.2.5', true );
+				
+				// Add Node.js polyfills BEFORE php-parser loads (it expects Node.js environment)
+				wp_add_inline_script( 'php-parser', '
+					if (typeof window.process === "undefined") {
+						window.process = { env: {}, version: "", platform: "browser" };
+					}
+					if (typeof window.global === "undefined") {
+						window.global = window;
+					}
+				', 'before' );
+				
 				// Enqueue Monaco Editor
 				// We add wp-backbone/underscore/jquery as dependencies to ensure they load BEFORE Monaco.
 				// If Monaco (AMD loader) loads first, it defines 'define', causing Backbone to register as an AMD module 
 				// instead of a global, breaking WP scripts that expect window.Backbone.
-				wp_enqueue_script( 'monaco-editor', 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.js', array( 'jquery', 'underscore', 'wp-backbone', 'wp-util' ), '0.44.0', true );
+				wp_enqueue_script( 'monaco-editor', 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.js', array( 'jquery', 'underscore', 'wp-backbone', 'wp-util', 'php-parser' ), '0.44.0', true );
 				
 				wp_enqueue_script( 'acf-block-builder-js', ACF_BLOCK_BUILDER_URL . 'assets/js/block-editor.js', array( 'jquery', 'monaco-editor' ), ACF_BLOCK_BUILDER_VERSION, true );
 				

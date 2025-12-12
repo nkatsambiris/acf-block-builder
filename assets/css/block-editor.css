@@ -609,10 +609,405 @@
     color: #2271b1;
 }
 
+/* Lint Error Badges */
+.acf-bb-lint-badge {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    border-radius: 9px;
+    color: #fff;
+}
+
+.acf-bb-lint-badge.has-errors {
+    display: inline-flex;
+    background: #d63638;
+}
+
+.acf-bb-lint-badge.has-warnings {
+    display: inline-flex;
+    background: #dba617;
+}
+
+.acf-bb-tab.has-lint-errors {
+    position: relative;
+}
+
+.acf-bb-tab.has-lint-errors::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 6px;
+    height: 6px;
+    background: #d63638;
+    border-radius: 50%;
+}
+
 /* Editor Wrapper */
 .acf-bb-editor-wrapper {
     position: relative;
     background: #fff;
+}
+
+/* Problems Panel */
+.acf-bb-problems-panel {
+    border-top: 1px solid #e2e4e7;
+    background: #f6f7f7;
+}
+
+.acf-bb-problems-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0;
+    background: #fff;
+    border-bottom: 1px solid #e2e4e7;
+}
+
+.acf-bb-problems-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1d2327;
+    flex: 1;
+    text-align: left;
+}
+
+.acf-bb-problems-toggle:hover {
+    background: #f6f7f7;
+}
+
+.acf-bb-problems-toggle .dashicons {
+    color: #8c8f94;
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.acf-bb-problems-panel.has-errors .acf-bb-problems-toggle .dashicons-warning {
+    color: #d63638;
+}
+
+.acf-bb-problems-panel.has-warnings .acf-bb-problems-toggle .dashicons-warning {
+    color: #dba617;
+}
+
+.acf-bb-problems-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 10px;
+    background: #e2e4e7;
+    color: #50575e;
+}
+
+.acf-bb-problems-panel.has-errors .acf-bb-problems-count {
+    background: #d63638;
+    color: #fff;
+}
+
+.acf-bb-problems-panel.has-warnings .acf-bb-problems-count {
+    background: #dba617;
+    color: #fff;
+}
+
+.acf-bb-toggle-icon {
+    margin-left: auto;
+    transition: transform 0.2s ease;
+}
+
+.acf-bb-problems-panel.collapsed .acf-bb-toggle-icon {
+    transform: rotate(180deg);
+}
+
+.acf-bb-fix-with-ai {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    margin-right: 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.acf-bb-fix-with-ai:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+}
+
+.acf-bb-fix-with-ai:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.acf-bb-fix-with-ai .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
+.acf-bb-problems-content {
+    max-height: 200px;
+    overflow-y: auto;
+    background: #1e1e1e;
+}
+
+.acf-bb-problems-panel.collapsed .acf-bb-problems-content {
+    display: none;
+}
+
+.acf-bb-problems-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 20px;
+    color: #50575e;
+    font-size: 13px;
+}
+
+.acf-bb-problems-empty .dashicons {
+    color: #00a32a;
+}
+
+.acf-bb-problems-panel.has-errors .acf-bb-problems-empty,
+.acf-bb-problems-panel.has-warnings .acf-bb-problems-empty {
+    display: none;
+}
+
+.acf-bb-problems-list {
+    display: none;
+}
+
+.acf-bb-problems-panel.has-errors .acf-bb-problems-list,
+.acf-bb-problems-panel.has-warnings .acf-bb-problems-list {
+    display: block;
+}
+
+.acf-bb-problems-group {
+    border-bottom: 1px solid #333;
+}
+
+.acf-bb-problems-group:last-child {
+    border-bottom: none;
+}
+
+.acf-bb-problems-file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #252526;
+    color: #cccccc;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.acf-bb-problems-file .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    color: #8c8f94;
+}
+
+.acf-bb-problem-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 12px 6px 28px;
+    color: #cccccc;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.acf-bb-problem-item:hover {
+    background: #2a2d2e;
+}
+
+.acf-bb-problem-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.acf-bb-problem-icon.error {
+    color: #f14c4c;
+}
+
+.acf-bb-problem-icon.warning {
+    color: #cca700;
+}
+
+.acf-bb-problem-message {
+    flex: 1;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.acf-bb-problem-location {
+    flex-shrink: 0;
+    color: #8c8f94;
+    font-family: monospace;
+    font-size: 11px;
+}
+
+/* Problems Actions in Header */
+.acf-bb-problems-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 12px;
+}
+
+.acf-bb-show-ignored {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    background: #2c3338;
+    color: #f0f0f1;
+    border: 1px solid #3c434a;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.acf-bb-show-ignored:hover {
+    background: #3c434a;
+}
+
+.acf-bb-show-ignored.active {
+    background: #2271b1;
+    border-color: #2271b1;
+    color: #fff;
+}
+
+.acf-bb-show-ignored .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
+.acf-bb-ignored-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 9px;
+    background: #8c8f94;
+    color: #fff;
+}
+
+/* Problem Item Actions */
+.acf-bb-problem-actions {
+    display: none;
+    margin-left: 8px;
+}
+
+.acf-bb-problem-item:hover .acf-bb-problem-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.acf-bb-problem-ignore {
+    padding: 2px 6px;
+    background: #3c434a;
+    color: #f0f0f1;
+    border: none;
+    border-radius: 3px;
+    font-size: 10px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.acf-bb-problem-ignore:hover {
+    background: #50575e;
+}
+
+/* Ignored Problems Section */
+.acf-bb-ignored-problems {
+    border-top: 1px solid #333;
+    background: #1a1a1a;
+}
+
+.acf-bb-ignored-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #2a2a2a;
+    color: #8c8f94;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.acf-bb-ignored-header .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
+.acf-bb-clear-ignored {
+    margin-left: auto;
+    padding: 4px 8px;
+    background: #3c434a;
+    color: #f0f0f1;
+    border: none;
+    border-radius: 3px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.acf-bb-clear-ignored:hover {
+    background: #d63638;
+    color: #fff;
+}
+
+.acf-bb-ignored-list .acf-bb-problem-item {
+    opacity: 0.6;
+}
+
+.acf-bb-problem-restore {
+    padding: 2px 6px;
+    background: #2271b1;
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    font-size: 10px;
+    cursor: pointer;
+}
+
+.acf-bb-problem-restore:hover {
+    background: #135e96;
 }
 
 .acf-bb-tab-content {

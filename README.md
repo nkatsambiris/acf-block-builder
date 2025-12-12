@@ -11,6 +11,11 @@ A WordPress plugin that allows you to create and manage ACF Blocks using AI and 
 3. Enter your API key and configure your settings
 4. Start generating new ACF Blocks
 
+## Version 1.4.0 Changes
+- NEW: Linting for json, css & html
+- NEW: PHP parsing
+- NEW: Issues list 
+
 ## Version 1.3.0 Changes
 - NEW: Support for multiple LLM models
 
