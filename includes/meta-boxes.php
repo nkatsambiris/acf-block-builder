@@ -423,6 +423,7 @@ class ACF_Block_Builder_Meta_Boxes {
 						<h3><?php _e( 'Review AI Changes', 'acf-block-builder' ); ?></h3>
 						<div class="acf-bb-diff-actions">
 							<button type="button" id="acf-bb-diff-cancel" class="button button-secondary"><?php _e( 'Discard', 'acf-block-builder' ); ?></button>
+							<button type="button" id="acf-bb-diff-apply-all" class="button button-primary" style="margin-right: 5px;"><?php _e( 'Apply All', 'acf-block-builder' ); ?></button>
 							<button type="button" id="acf-bb-diff-apply" class="button button-primary"><?php _e( 'Apply Changes', 'acf-block-builder' ); ?></button>
 						</div>
 					</div>

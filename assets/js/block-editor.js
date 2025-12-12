@@ -1836,7 +1836,7 @@ jQuery(document).ready(function($) {
 
         // 1. Identify changes
         var firstChangedTab = null;
-        $('.acf-bb-diff-tabs .acf-bb-tab').removeClass('active has-changes file-accepted file-rejected file-pending');
+        $('.acf-bb-diff-tabs .acf-bb-tab').removeClass('active has-changes file-accepted file-rejected file-pending').hide();
         $('.acf-bb-diff-tabs .acf-bb-tab .acf-bb-tab-status').html('');
 
         $.each(keyMap, function(tabId, dataKey) {
@@ -1852,7 +1852,7 @@ jQuery(document).ready(function($) {
 
             // Normalize line endings for comparison
             if (newVal.replace(/\r\n/g, '\n').trim() !== currentVal.replace(/\r\n/g, '\n').trim()) {
-                $('[data-diff-tab="' + tabId + '"]').addClass('has-changes');
+                $('[data-diff-tab="' + tabId + '"]').addClass('has-changes').show();
                 fileAcceptanceStatus[tabId] = 'pending';
                 changedFileTabs.push(tabId);
                 if (!firstChangedTab) firstChangedTab = tabId;
@@ -1934,6 +1934,46 @@ jQuery(document).ready(function($) {
         if (window.updateFileNavigation) {
             window.updateFileNavigation();
         }
+    });
+
+    // Apply All Changes - bypasses review status and applies all pending AI changes
+    $('#acf-bb-diff-apply-all').on('click', function(e) {
+        e.preventDefault();
+        if (!pendingAIChanges) return;
+
+        var appliedFiles = [];
+
+        $.each(keyMap, function(tabId, dataKey) {
+            if (pendingAIChanges[dataKey] !== undefined) {
+                 if (editors[tabId]) {
+                    var trimmedCode = pendingAIChanges[dataKey]
+                        .replace(/^\s*\n/, '')
+                        .replace(/\n\s*$/, '');
+                    
+                    // Check if there's actually a change before applying
+                    var currentVal = editors[tabId].getValue();
+                     if (trimmedCode.replace(/\r\n/g, '\n').trim() !== currentVal.replace(/\r\n/g, '\n').trim()) {
+                        editors[tabId].setValue(trimmedCode);
+                        appliedFiles.push(tabId);
+                    }
+                }
+            }
+        });
+
+        $('#acf-bb-diff-overlay').removeClass('visible').hide();
+        
+        var message = 'All changes applied successfully.';
+        if (appliedFiles.length > 0) {
+             message = 'Applied changes to ' + appliedFiles.length + ' file(s).';
+        } else {
+             message = 'No changes were applied.';
+        }
+        
+        appendMessage('ai', message);
+        
+        pendingAIChanges = {};
+        fileAcceptanceStatus = {};
+        changedFileTabs = [];
     });
 
     // Apply Changes - only applies accepted or pending (not rejected) files
