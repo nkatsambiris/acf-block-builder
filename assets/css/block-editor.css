@@ -479,6 +479,25 @@
     height: 18px;
 }
 
+/* Stop Mode Button */
+.acf-bb-send-btn.acf-bb-stop-mode {
+    background: #f0f0f1;
+    color: #d63638;
+    border: 1px solid #dcdcde;
+}
+
+.acf-bb-send-btn.acf-bb-stop-mode:hover {
+    background: #e5e7eb;
+    color: #b32d2e;
+    border-color: #c3c4c7;
+}
+
+.acf-bb-send-btn.acf-bb-stop-mode .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+}
+
 /* Removed - Mode indicator no longer needed as switcher is visible */
 
 /* Ask Mode Footer Message */
@@ -1602,8 +1621,9 @@
     font-size: 14px;
     color: #3c434a;
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-start;
-    gap: 8px;
+    gap: 0px;
 }
 
 .acf-bb-summary-list li:last-child {
@@ -1628,6 +1648,11 @@
     color: #2271b1;
     margin-top: 2px;
     flex-shrink: 0;
+}
+
+.acf-bb-summary-text {
+    flex: 1;
+    min-width: 0;
 }
 
 .acf-bb-plan-content {

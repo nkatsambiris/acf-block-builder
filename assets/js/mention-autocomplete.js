@@ -1272,6 +1272,10 @@
     }
 
     function updateSendButton() {
+        // If in stop mode (generating), do not interfere
+        if ($('#acf-block-builder-generate').hasClass('acf-bb-stop-mode')) {
+            return;
+        }
         var hasContent = getPlainText().length > 0 || getAttachedTokens().length > 0;
         var hasImage = $('#acf_block_builder_image_id').val().length > 0;
         $('#acf-block-builder-generate').prop('disabled', !hasContent && !hasImage);

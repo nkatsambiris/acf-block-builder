@@ -1,5 +1,6 @@
 jQuery(document).ready(function($) {
     var editors = {};
+    var currentAbortController = null;
     var chatHistory = [];
     var diffEditor = null;
     var pendingAIChanges = {};
@@ -316,6 +317,12 @@ jQuery(document).ready(function($) {
     // Fallback for textarea if MentionAutocomplete not loaded
     $('#acf_block_builder_prompt').on('input', function() {
         if (window.MentionAutocomplete) return; // Let MentionAutocomplete handle it
+        
+        // If in stop mode (generating), do not interfere
+        if ($('#acf-block-builder-generate').hasClass('acf-bb-stop-mode')) {
+            return;
+        }
+        
         var hasText = $(this).val().trim().length > 0;
         var hasImage = $('#acf_block_builder_image_id').val().length > 0;
         $('#acf-block-builder-generate').prop('disabled', !hasText && !hasImage);
@@ -329,6 +336,12 @@ jQuery(document).ready(function($) {
         $('#acf-bb-image-preview-mini').hide().html('');
         $('#acf-bb-upload-image').removeClass('active');
         // Update send button state
+        
+        // If in stop mode (generating), do not interfere
+        if ($('#acf-block-builder-generate').hasClass('acf-bb-stop-mode')) {
+            return;
+        }
+
         var hasText = $('#acf_block_builder_prompt').val().trim().length > 0;
         $('#acf-block-builder-generate').prop('disabled', !hasText);
     });
@@ -706,7 +719,7 @@ jQuery(document).ready(function($) {
                     if (window.SmartTokens && window.SmartTokens.processPlainText) {
                         processedItem = window.SmartTokens.processPlainText(item);
                     }
-                    html += '<li><span class="dashicons dashicons-yes"></span> ' + processedItem + '</li>';
+                    html += '<li><span class="dashicons dashicons-yes"></span> <span class="acf-bb-summary-text">' + processedItem + '</span></li>';
                 });
                 html += '</ul></div>';
             }
@@ -2149,6 +2162,13 @@ jQuery(document).ready(function($) {
 
     $('#acf-block-builder-generate').on('click', async function(e) {
         e.preventDefault();
+
+        // Check for Stop action
+        if (currentAbortController) {
+            currentAbortController.abort();
+            currentAbortController = null;
+            return;
+        }
         
         // Get prompt from MentionAutocomplete (contenteditable) or fallback to textarea
         var prompt = '';
@@ -2167,7 +2187,7 @@ jQuery(document).ready(function($) {
         }
 
         var $btn = $(this);
-        $btn.prop('disabled', true);
+        // Do not disable the button, we transition to Stop mode
         
         // Capture chat history BEFORE adding the current user message
         // This ensures we don't duplicate the current message in the API call
@@ -2230,7 +2250,13 @@ jQuery(document).ready(function($) {
         $('#acf_block_builder_image_id').val('');
         $('#acf-bb-image-preview-mini').hide().html('');
         $('#acf-bb-upload-image').removeClass('active');
-        $('#acf-block-builder-generate').prop('disabled', true);
+        
+        // Set Stop Mode
+        var $btn = $('#acf-block-builder-generate');
+        $btn.addClass('acf-bb-stop-mode');
+        $btn.html('<span class="dashicons dashicons-no-alt"></span>');
+        $btn.prop('title', 'Stop Generation');
+        currentAbortController = new AbortController();
 
         // Start AI Message Container (will update avatar once we receive provider info)
         var $aiMessage = $('<div class="acf-bb-message ai-message streaming"><div class="acf-bb-avatar"><span class="dashicons dashicons-superhero"></span></div><div class="acf-bb-message-content"><span class="acf-bb-typing">Thinking</span></div></div>');
@@ -2267,7 +2293,8 @@ jQuery(document).ready(function($) {
         try {
             const response = await fetch(acfBlockBuilder.ajax_url, {
                 method: 'POST',
-                body: formData
+                body: formData,
+                signal: currentAbortController.signal
             });
 
             if (!response.body) throw new Error('ReadableStream not supported.');
@@ -2769,9 +2796,33 @@ jQuery(document).ready(function($) {
             }
 
         } catch (err) {
-            $aiContent.append('<div class="error">Connection Error: ' + err.message + '</div>');
+            if (err.name === 'AbortError') {
+                 $aiContent.append('<div class="acf-bb-system-message" style="color: #d63638; margin-top: 10px;"><em><span class="dashicons dashicons-no-alt" style="font-size: 14px; width: 14px; height: 14px; vertical-align: middle;"></span> Generation stopped by user.</em></div>');
+            } else {
+                $aiContent.append('<div class="error">Connection Error: ' + err.message + '</div>');
+            }
         } finally {
-            $btn.prop('disabled', false);
+            // Reset button
+            var $btn = $('#acf-block-builder-generate');
+            $btn.removeClass('acf-bb-stop-mode');
+            $btn.html('<span class="dashicons dashicons-arrow-up-alt2"></span>');
+            $btn.removeAttr('title');
+            
+            // Re-evaluate disabled state
+            var prompt = '';
+            var hasAttachedFiles = false;
+            
+            if (window.MentionAutocomplete && window.MentionAutocomplete.getPlainText) {
+                prompt = window.MentionAutocomplete.getPlainText().trim();
+                hasAttachedFiles = window.MentionAutocomplete.getAttachedTokens().length > 0;
+            } else {
+                prompt = $('#acf_block_builder_prompt').val().trim();
+            }
+            
+            var imageId = $('#acf_block_builder_image_id').val();
+            $btn.prop('disabled', !prompt && !imageId && !hasAttachedFiles);
+            
+            currentAbortController = null;
         }
     });
 
