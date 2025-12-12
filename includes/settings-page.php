@@ -46,6 +46,8 @@ class ACF_Block_Builder_Settings {
 
 	public function register_settings() {
 		register_setting( 'acf_block_builder_settings', 'acf_block_builder_gemini_api_key' );
+		register_setting( 'acf_block_builder_settings', 'acf_block_builder_openai_api_key' );
+		register_setting( 'acf_block_builder_settings', 'acf_block_builder_anthropic_api_key' );
 		register_setting( 'acf_block_builder_settings', 'acf_block_builder_debug_enabled' );
 	}
 
@@ -73,23 +75,54 @@ class ACF_Block_Builder_Settings {
 				<div class="acf-block-builder-grid">
 					<div class="acf-block-builder-main">
 						
-						<!-- General Settings Card -->
+						<!-- AI Provider API Keys Card -->
 						<div class="acf-block-builder-card">
 							<div class="acf-block-builder-card-header">
-								<h2><?php esc_html_e( 'General Settings', 'acf-block-builder' ); ?></h2>
+								<h2><?php esc_html_e( 'AI Provider API Keys', 'acf-block-builder' ); ?></h2>
 							</div>
 							<div class="acf-block-builder-card-body">
+								<p class="acf-block-builder-description" style="margin-bottom: 20px;">
+									<?php esc_html_e( 'Configure API keys for the AI providers you want to use. You can add keys for multiple providers and switch between them when chatting.', 'acf-block-builder' ); ?>
+								</p>
 								
 								<div class="acf-block-builder-field-group">
-									<label class="acf-block-builder-field-label" for="acf_block_builder_gemini_api_key"><?php esc_html_e( 'Gemini API Key', 'acf-block-builder' ); ?></label>
+									<label class="acf-block-builder-field-label" for="acf_block_builder_anthropic_api_key">
+										<span class="dashicons dashicons-cloud" style="margin-right: 5px;"></span>
+										<?php esc_html_e( 'Anthropic API Key', 'acf-block-builder' ); ?>
+									</label>
 									<div class="acf-block-builder-input-wrapper">
-										<input type="password" id="acf_block_builder_gemini_api_key" name="acf_block_builder_gemini_api_key" value="<?php echo esc_attr( get_option( 'acf_block_builder_gemini_api_key' ) ); ?>" />
+										<input type="password" id="acf_block_builder_anthropic_api_key" name="acf_block_builder_anthropic_api_key" value="<?php echo esc_attr( get_option( 'acf_block_builder_anthropic_api_key' ) ); ?>" placeholder="sk-ant-..." />
 									</div>
 									<p class="acf-block-builder-description">
-										<?php echo wp_kses_post( __( 'Enter your Gemini API Key. You can get one from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.', 'acf-block-builder' ) ); ?>
+										<?php echo wp_kses_post( __( 'For Claude models. Get your key from <a href="https://console.anthropic.com/settings/keys" target="_blank">Anthropic Console</a>.', 'acf-block-builder' ) ); ?>
 									</p>
 								</div>
 
+								<div class="acf-block-builder-field-group">
+									<label class="acf-block-builder-field-label" for="acf_block_builder_gemini_api_key">
+										<span class="dashicons dashicons-google" style="margin-right: 5px;"></span>
+										<?php esc_html_e( 'Google Gemini API Key', 'acf-block-builder' ); ?>
+									</label>
+									<div class="acf-block-builder-input-wrapper">
+										<input type="password" id="acf_block_builder_gemini_api_key" name="acf_block_builder_gemini_api_key" value="<?php echo esc_attr( get_option( 'acf_block_builder_gemini_api_key' ) ); ?>" placeholder="AIza..." />
+									</div>
+									<p class="acf-block-builder-description">
+										<?php echo wp_kses_post( __( 'For Gemini models. Get your key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.', 'acf-block-builder' ) ); ?>
+									</p>
+								</div>
+
+								<div class="acf-block-builder-field-group">
+									<label class="acf-block-builder-field-label" for="acf_block_builder_openai_api_key">
+										<span class="dashicons dashicons-admin-site-alt3" style="margin-right: 5px;"></span>
+										<?php esc_html_e( 'OpenAI API Key', 'acf-block-builder' ); ?>
+									</label>
+									<div class="acf-block-builder-input-wrapper">
+										<input type="password" id="acf_block_builder_openai_api_key" name="acf_block_builder_openai_api_key" value="<?php echo esc_attr( get_option( 'acf_block_builder_openai_api_key' ) ); ?>" placeholder="sk-..." />
+									</div>
+									<p class="acf-block-builder-description">
+										<?php echo wp_kses_post( __( 'For GPT and o1 models. Get your key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>.', 'acf-block-builder' ) ); ?>
+									</p>
+								</div>
 
 							</div>
 						</div>

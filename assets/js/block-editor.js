@@ -3,6 +3,11 @@ jQuery(document).ready(function($) {
     var chatHistory = [];
     var diffEditor = null;
     var pendingAIChanges = {};
+    var availableModels = [];
+    var selectedModel = '';
+    
+    // Model picker storage key
+    var MODEL_STORAGE_KEY = 'acf_block_builder_selected_model';
     
     // Load existing history
     var rawHistoryVal = '';
@@ -15,6 +20,294 @@ jQuery(document).ready(function($) {
         console.error('Error parsing chat history', e);
         console.log('Raw history value:', rawHistoryVal);
     }
+    
+    // Initialize model picker
+    function initModelPicker() {
+        var $select = $('#acf_block_builder_model');
+        
+        $.ajax({
+            url: acfBlockBuilder.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'acf_block_builder_get_models',
+                nonce: acfBlockBuilder.nonce
+            },
+            success: function(response) {
+                if (response.success && response.data) {
+                    availableModels = response.data;
+                    populateModelPicker(availableModels);
+                    // Update initial welcome avatar after models are loaded
+                    updateInitialWelcomeAvatar();
+                } else {
+                    $select.html('<option value="">No models available</option>');
+                    $select.prop('disabled', true);
+                }
+            },
+            error: function() {
+                $select.html('<option value="">Error loading models</option>');
+                $select.prop('disabled', true);
+            }
+        });
+    }
+    
+    function populateModelPicker(models) {
+        var $select = $('#acf_block_builder_model');
+        var savedModel = localStorage.getItem(MODEL_STORAGE_KEY);
+        var html = '';
+        
+        // Group models by provider
+        var groupedModels = {};
+        models.forEach(function(model) {
+            if (!groupedModels[model.provider]) {
+                groupedModels[model.provider] = [];
+            }
+            groupedModels[model.provider].push(model);
+        });
+        
+        // Build hidden select (for form submission)
+        $.each(groupedModels, function(provider, providerModels) {
+            html += '<optgroup label="' + (providerNames[provider] || provider) + '">';
+            providerModels.forEach(function(model) {
+                var isSelected = (savedModel === model.id) ? ' selected' : '';
+                html += '<option value="' + model.id + '"' + isSelected + '>' + model.name + '</option>';
+            });
+            html += '</optgroup>';
+        });
+        
+        $select.html(html);
+        
+        // Set selected model
+        if (savedModel && models.some(function(m) { return m.id === savedModel; })) {
+            selectedModel = savedModel;
+        } else if (models.length > 0) {
+            selectedModel = models[0].id;
+        }
+        
+        $select.val(selectedModel);
+        
+        // Update welcome avatar to match the selected model
+        var provider = getProviderFromModel(selectedModel);
+        updateWelcomeAvatar(provider);
+        
+        // Update model display in header
+        updateModelDisplay();
+    }
+    
+    // Helper function to get provider from model ID
+    function getProviderFromModel(modelId) {
+        if (!modelId) return null;
+        
+        // Find the model in availableModels array
+        var model = availableModels.find(function(m) { return m.id === modelId; });
+        return model ? model.provider : null;
+    }
+    
+    // Helper function to update welcome message avatar
+    function updateWelcomeAvatar(provider) {
+        var $welcomeMessage = $('#acf-bb-chat-messages .acf-bb-message:first');
+        if ($welcomeMessage.length && $welcomeMessage.hasClass('ai-message')) {
+            var $avatar = $welcomeMessage.find('.acf-bb-avatar');
+            
+            if (provider) {
+                $avatar.html('<img src="' + acfBlockBuilder.plugin_url + 'assets/images/' + provider + '.svg" alt="' + provider + '" />')
+                    .removeClass('acf-bb-avatar-openai acf-bb-avatar-anthropic acf-bb-avatar-gemini')
+                    .addClass('acf-bb-avatar-' + provider);
+            } else {
+                // Fallback to default icon
+                $avatar.html('<span class="dashicons dashicons-superhero"></span>')
+                    .removeClass('acf-bb-avatar-openai acf-bb-avatar-anthropic acf-bb-avatar-gemini');
+            }
+        }
+    }
+    
+    // Handle model selection change
+    $('#acf_block_builder_model').on('change', function() {
+        selectedModel = $(this).val();
+        localStorage.setItem(MODEL_STORAGE_KEY, selectedModel);
+        
+        // Update the welcome message avatar based on selected model
+        var provider = getProviderFromModel(selectedModel);
+        updateWelcomeAvatar(provider);
+        
+        // Update model display
+        updateModelDisplay();
+    });
+    
+    // Initialize model picker on page load
+    initModelPicker();
+    
+    // ==========================================
+    // NEW UI HANDLERS
+    // ==========================================
+    
+    // Mode Switcher
+    var currentMode = 'agent'; // 'agent' or 'ask'
+    
+    $('.acf-bb-mode-btn').on('click', function() {
+        var mode = $(this).data('mode');
+        currentMode = mode;
+        
+        // Update button states
+        $('.acf-bb-mode-btn').removeClass('active');
+        $(this).addClass('active');
+        
+        // Update hidden field
+        $('#acf_block_builder_mode').val(mode);
+        
+        // Update body class for conditional styling
+        $('body').toggleClass('acf-bb-ask-mode', mode === 'ask');
+        
+        // Update placeholder
+        var $textarea = $('#acf_block_builder_prompt');
+        if (mode === 'agent') {
+            $textarea.attr('placeholder', $textarea.data('placeholder-agent'));
+        } else {
+            $textarea.attr('placeholder', $textarea.data('placeholder-ask'));
+        }
+    });
+    
+    // Provider icons mapping
+    var providerIcons = {
+        'openai': acfBlockBuilder.plugin_url + 'assets/images/openai.svg',
+        'anthropic': acfBlockBuilder.plugin_url + 'assets/images/anthropic.svg',
+        'gemini': acfBlockBuilder.plugin_url + 'assets/images/gemini.svg'
+    };
+    
+    var providerNames = {
+        'anthropic': 'Anthropic',
+        'gemini': 'Google Gemini',
+        'openai': 'OpenAI'
+    };
+    
+    // Build custom dropdown with icons
+    function buildModelDropdown() {
+        if (!availableModels.length) return;
+        
+        var $dropdown = $('#acf-bb-model-dropdown');
+        $dropdown.empty();
+        
+        // Group models by provider
+        var groupedModels = {};
+        availableModels.forEach(function(model) {
+            if (!groupedModels[model.provider]) {
+                groupedModels[model.provider] = [];
+            }
+            groupedModels[model.provider].push(model);
+        });
+        
+        // Build dropdown HTML
+        $.each(groupedModels, function(provider, models) {
+            // Provider header
+            $dropdown.append(
+                '<div class="acf-bb-dropdown-group-label">' + 
+                (providerNames[provider] || provider) + 
+                '</div>'
+            );
+            
+            // Model options
+            models.forEach(function(model) {
+                var isSelected = model.id === selectedModel;
+                var $option = $('<div class="acf-bb-dropdown-option' + (isSelected ? ' selected' : '') + '" data-model-id="' + model.id + '">' +
+                    '<img class="acf-bb-option-icon" src="' + providerIcons[provider] + '" alt="' + provider + '" />' +
+                    '<span class="acf-bb-option-name">' + model.name + '</span>' +
+                    (isSelected ? '<span class="acf-bb-option-check dashicons dashicons-yes"></span>' : '') +
+                    '</div>');
+                $dropdown.append($option);
+            });
+        });
+    }
+    
+    // Model Dropdown Toggle
+    $('#acf-bb-model-trigger').on('click', function(e) {
+        e.stopPropagation();
+        var $dropdown = $('#acf-bb-model-dropdown');
+        
+        if ($dropdown.is(':visible')) {
+            $dropdown.hide();
+        } else {
+            buildModelDropdown();
+            $dropdown.show();
+        }
+    });
+    
+    // Handle model selection from dropdown
+    $(document).on('click', '.acf-bb-dropdown-option', function() {
+        var modelId = $(this).data('model-id');
+        selectedModel = modelId;
+        localStorage.setItem(MODEL_STORAGE_KEY, selectedModel);
+        
+        // Update hidden select
+        $('#acf_block_builder_model').val(modelId);
+        
+        // Update display
+        updateModelDisplay();
+        
+        // Update welcome avatar
+        var provider = getProviderFromModel(selectedModel);
+        updateWelcomeAvatar(provider);
+        
+        // Close dropdown
+        $('#acf-bb-model-dropdown').hide();
+    });
+    
+    // Close dropdown when clicking outside
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('.acf-bb-model-selector').length) {
+            $('#acf-bb-model-dropdown').hide();
+        }
+    });
+    
+    // Update model display when selection changes
+    function updateModelDisplay() {
+        if (!selectedModel || !availableModels.length) return;
+        
+        var model = availableModels.find(function(m) { return m.id === selectedModel; });
+        if (!model) return;
+        
+        var provider = model.provider;
+        
+        var $trigger = $('#acf-bb-model-trigger');
+        $trigger.find('.acf-bb-model-name').text(model.name);
+        
+        // Update icon
+        var $icon = $trigger.find('.acf-bb-model-icon');
+        if (providerIcons[provider]) {
+            $icon.css('background-image', 'url(' + providerIcons[provider] + ')')
+                .css('background-size', 'cover')
+                .css('background-position', 'center');
+        }
+    }
+    
+    // Enable/Disable Send Button
+    $('#acf_block_builder_prompt').on('input', function() {
+        var hasText = $(this).val().trim().length > 0;
+        var hasImage = $('#acf_block_builder_image_id').val().length > 0;
+        $('#acf-block-builder-generate').prop('disabled', !hasText && !hasImage);
+    });
+    
+    // Auto-resize textarea
+    $('#acf_block_builder_prompt').on('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+    });
+    
+    // Mention Files Button (placeholder for future functionality)
+    $('#acf-bb-mention-files').on('click', function() {
+        var $textarea = $('#acf_block_builder_prompt');
+        var currentText = $textarea.val();
+        $textarea.val(currentText + '@').focus();
+        // TODO: Show file picker dropdown
+    });
+    
+    // Remove attachment
+    $(document).on('click', '.acf-bb-remove-attachment', function() {
+        $('#acf_block_builder_image_id').val('');
+        $('#acf-bb-image-preview-mini').hide().html('');
+        $('#acf-bb-upload-image').removeClass('active');
+        // Update send button state
+        var hasText = $('#acf_block_builder_prompt').val().trim().length > 0;
+        $('#acf-block-builder-generate').prop('disabled', !hasText);
+    });
 
     // Clear Chat History button handler
     $(document).on('click', '#acf-bb-clear-history', function(e) {
@@ -24,9 +317,18 @@ jQuery(document).ready(function($) {
             chatHistory = [];
             $('#acf-bb-chat-messages').empty();
             
-            // Show welcome message
+            // Show welcome message with provider avatar
+            var provider = getProviderFromModel(selectedModel);
+            var avatarHtml = '';
+            
+            if (provider) {
+                avatarHtml = '<div class="acf-bb-avatar acf-bb-avatar-' + provider + '"><img src="' + acfBlockBuilder.plugin_url + 'assets/images/' + provider + '.svg" alt="' + provider + '" /></div>';
+            } else {
+                avatarHtml = '<div class="acf-bb-avatar"><span class="dashicons dashicons-superhero"></span></div>';
+            }
+            
             var welcomeHtml = '<div class="acf-bb-message ai-message">' +
-                '<div class="acf-bb-avatar"><span class="dashicons dashicons-superhero"></span></div>' +
+                avatarHtml +
                 '<div class="acf-bb-message-content">Hello! Describe the block you want to build, or upload a reference image.</div>' +
                 '</div>';
             $('#acf-bb-chat-messages').append(welcomeHtml);
@@ -113,10 +415,17 @@ jQuery(document).ready(function($) {
     // Run enhancement
     initEnhancedHeader();
 
-    function appendMessage(type, content, imageUrl, skipSave) {
+    function appendMessage(type, content, imageUrl, skipSave, provider) {
         var icon = type === 'ai' ? 'superhero' : 'admin-users';
         var html = '<div class="acf-bb-message ' + type + '-message">';
-        html += '<div class="acf-bb-avatar"><span class="dashicons dashicons-' + icon + '"></span></div>';
+        
+        // Use provider logo if available, otherwise fallback to dashicon
+        if (type === 'ai' && provider) {
+            html += '<div class="acf-bb-avatar acf-bb-avatar-' + provider + '"><img src="' + acfBlockBuilder.plugin_url + 'assets/images/' + provider + '.svg" alt="' + provider + '" /></div>';
+        } else {
+            html += '<div class="acf-bb-avatar"><span class="dashicons dashicons-' + icon + '"></span></div>';
+        }
+        
         html += '<div class="acf-bb-message-content">';
         html += content; 
         if (imageUrl) {
@@ -130,7 +439,12 @@ jQuery(document).ready(function($) {
         if (!skipSave) {
             // Store plain text only, not HTML - prevents JSON parsing issues
             var plainText = content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-            chatHistory.push({ type: type, text: plainText, image_url: imageUrl || null });
+            chatHistory.push({ 
+                type: type, 
+                text: plainText, 
+                image_url: imageUrl || null,
+                provider: provider || null
+            });
             saveChatHistory();
         }
     }
@@ -180,7 +494,14 @@ jQuery(document).ready(function($) {
             }
             
             var html = '<div class="acf-bb-message ' + msg.type + '-message">';
-            html += '<div class="acf-bb-avatar"><span class="dashicons dashicons-' + icon + '"></span></div>';
+            
+            // Use provider logo if available for AI messages
+            if (msg.type === 'ai' && msg.provider) {
+                html += '<div class="acf-bb-avatar acf-bb-avatar-' + msg.provider + '"><img src="' + acfBlockBuilder.plugin_url + 'assets/images/' + msg.provider + '.svg" alt="' + msg.provider + '" /></div>';
+            } else {
+                html += '<div class="acf-bb-avatar"><span class="dashicons dashicons-' + icon + '"></span></div>';
+            }
+            
             html += '<div class="acf-bb-message-content">' + displayContent;
             
             // Render code blocks if present (new format) - create Monaco containers
@@ -267,6 +588,15 @@ jQuery(document).ready(function($) {
     
     // Render history HTML immediately
     renderChatHistory();
+    
+    // If there's no chat history, the welcome message will be showing
+    // Update it once the model picker is initialized
+    function updateInitialWelcomeAvatar() {
+        if (chatHistory.length === 0 && selectedModel) {
+            var provider = getProviderFromModel(selectedModel);
+            updateWelcomeAvatar(provider);
+        }
+    }
 
     // Track chat Monaco editors for cleanup
     var chatMonacoEditors = [];
@@ -989,9 +1319,18 @@ jQuery(document).ready(function($) {
             
             $('#acf_block_builder_image_id').val(attachment.id);
             // Show preview
-            $('#acf-bb-image-preview-mini').html('<img src="' + attachment.url + '" style="height: 40px; width: auto; border-radius: 4px;" />').show();
-            // Change icon style to indicate active
-            $('#acf-bb-upload-image').addClass('active-image');
+            $('#acf-bb-image-preview-mini').html(
+                '<div class="acf-bb-attachment-item">' +
+                '<img src="' + attachment.url + '" />' +
+                '<button type="button" class="acf-bb-remove-attachment" data-attachment-id="' + attachment.id + '">' +
+                '<span class="dashicons dashicons-no-alt"></span>' +
+                '</button>' +
+                '</div>'
+            ).show();
+            // Enable send button
+            $('#acf-block-builder-generate').prop('disabled', false);
+            // Add active state to button
+            $('#acf-bb-upload-image').addClass('active');
         });
 
         file_frame.open();
@@ -1024,15 +1363,19 @@ jQuery(document).ready(function($) {
         appendMessage('user', prompt || 'Generating block from image...', imageUrl);
         
         // Clear input
-        $('#acf_block_builder_prompt').val('');
+        $('#acf_block_builder_prompt').val('').css('height', 'auto');
         $('#acf_block_builder_image_id').val('');
         $('#acf-bb-image-preview-mini').hide().html('');
-        $('#acf-bb-upload-image').removeClass('active-image');
+        $('#acf-bb-upload-image').removeClass('active');
+        $('#acf-block-builder-generate').prop('disabled', true);
 
-        // Start AI Message Container
+        // Start AI Message Container (will update avatar once we receive provider info)
         var $aiMessage = $('<div class="acf-bb-message ai-message streaming"><div class="acf-bb-avatar"><span class="dashicons dashicons-superhero"></span></div><div class="acf-bb-message-content"><span class="acf-bb-typing">Thinking</span></div></div>');
         $('#acf-bb-chat-messages').append($aiMessage);
         var $aiContent = $aiMessage.find('.acf-bb-message-content');
+        var currentProvider = null;
+        var currentModel = null;
+        var currentResponseMode = currentMode; // Track mode for this response
 
         scrollToBottom();
 
@@ -1047,6 +1390,8 @@ jQuery(document).ready(function($) {
         formData.append('title', $('#title').val()); // Get post title
         formData.append('current_code', currentCode);
         formData.append('chat_history', historyToSend);
+        formData.append('model', selectedModel || $('#acf_block_builder_model').val());
+        formData.append('mode', currentMode); // Send current mode (agent/ask)
 
         var startTime = Date.now();
 
@@ -1104,6 +1449,23 @@ jQuery(document).ready(function($) {
                                 bytes[i] = binaryStr.charCodeAt(i);
                             }
                             const textChunk = new TextDecoder().decode(bytes);
+                            
+                            // Check if this is provider/mode info (first message)
+                            try {
+                                const providerInfo = JSON.parse(textChunk);
+                                if (providerInfo.provider && providerInfo.model && !currentProvider) {
+                                    currentProvider = providerInfo.provider;
+                                    currentModel = providerInfo.model;
+                                    if (providerInfo.mode) {
+                                        currentResponseMode = providerInfo.mode;
+                                    }
+                                    // Update avatar with provider logo
+                                    $aiMessage.find('.acf-bb-avatar').html('<img src="' + acfBlockBuilder.plugin_url + 'assets/images/' + currentProvider + '.svg" alt="' + currentProvider + '" />').addClass('acf-bb-avatar-' + currentProvider);
+                                    continue; // Skip to next line
+                                }
+                            } catch (e) {
+                                // Not provider info, continue with normal processing
+                            }
                             
                             // Accumulate JSON text
                             jsonAccumulator += textChunk;
@@ -1431,7 +1793,10 @@ jQuery(document).ready(function($) {
                 text: '',
                 code: {},
                 summary: [],
-                image_url: null
+                image_url: null,
+                provider: currentProvider,
+                model: currentModel,
+                mode: currentResponseMode
             };
             
             // Extract code from pendingAIChanges (plain text, not HTML)
@@ -1470,16 +1835,23 @@ jQuery(document).ready(function($) {
             chatHistory.push(historyEntry);
             saveChatHistory();
             
-            // Trigger Diff View automatically
-            if (Object.keys(pendingAIChanges).length > 0) {
-                 showDiffOverlay(pendingAIChanges);
-                 var duration = ((Date.now() - startTime) / 1000).toFixed(1);
-                 
-                 var statusMsg = '<div><strong>Updates ready for review. (' + duration + 's)</strong></div>';
-                 $aiContent.append(statusMsg);
+            // Only trigger Diff View in Agent mode
+            if (currentResponseMode === 'agent') {
+                if (Object.keys(pendingAIChanges).length > 0) {
+                     showDiffOverlay(pendingAIChanges);
+                     var duration = ((Date.now() - startTime) / 1000).toFixed(1);
+                     
+                     var statusMsg = '<div><strong>Updates ready for review. (' + duration + 's)</strong></div>';
+                     $aiContent.append(statusMsg);
+                } else {
+                     var statusMsg = '<div><em>No code changes detected.</em></div>';
+                     $aiContent.append(statusMsg);
+                }
             } else {
-                 var statusMsg = '<div><em>No code changes detected.</em></div>';
-                 $aiContent.append(statusMsg);
+                // Ask mode - just show completion message
+                var duration = ((Date.now() - startTime) / 1000).toFixed(1);
+                var statusMsg = '<div class="acf-bb-ask-mode-footer"><em>Response complete (' + duration + 's). Switch to Agent mode to generate code.</em></div>';
+                $aiContent.append(statusMsg);
             }
 
         } catch (err) {

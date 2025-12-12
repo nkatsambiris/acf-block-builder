@@ -11,6 +11,9 @@ A WordPress plugin that allows you to create and manage ACF Blocks using AI and 
 3. Enter your API key and configure your settings
 4. Start generating new ACF Blocks
 
+## Version 1.3.0 Changes
+- NEW: Support for multiple LLM models
+
 ## Version 1.2.0 Changes
 - FIX: Resolved duplicate chat summaries in chat window
 - UPDATE: Overhauled the chat window

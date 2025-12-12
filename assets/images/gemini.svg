@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="600" height="600" viewBox="0 0 600 600">
+  <defs>
+    <linearGradient id="linear-gradient" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#5b94e0"/>
+      <stop offset="1" stop-color="#bc6c7b"/>
+    </linearGradient>
+    <clipPath id="clip-gemini">
+      <rect width="600" height="600"/>
+    </clipPath>
+  </defs>
+  <g id="gemini" clip-path="url(#clip-gemini)">
+    <rect width="600" height="600" fill="url(#linear-gradient)"/>
+    <path id="gemini-fill" d="M450,225.45C329.306,232.725,232.687,329.306,225.431,450h-.881C217.275,329.306,120.675,232.725,0,225.45v-.881C120.694,217.275,217.275,120.694,224.55,0h.881C232.706,120.694,329.306,217.275,450,224.569Z" transform="translate(75 75)" fill="#fff"/>
+  </g>
+</svg>

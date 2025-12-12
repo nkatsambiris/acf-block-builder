@@ -333,6 +333,7 @@ class ACF_Block_Builder_Meta_Boxes {
 		?>
 		<div class="acf-block-builder-container">
 			<div class="acf-bb-chat-interface">
+				<!-- Chat Messages -->
 				<div class="acf-bb-chat-messages" id="acf-bb-chat-messages">
 					<?php if ( empty( $chat_history ) ) : ?>
 						<div class="acf-bb-message ai-message">
@@ -345,20 +346,75 @@ class ACF_Block_Builder_Meta_Boxes {
 					<?php // Chat history is rendered by JavaScript from the hidden field to handle structured data properly ?>
 				</div>
 				
-				<div class="acf-bb-chat-input-area">
-					<div class="acf-bb-chat-tools">
-						<input type="hidden" id="acf_block_builder_image_id" name="acf_block_builder_image_id" value="">
-						<div id="acf-bb-image-preview-mini" style="display: none; margin-right: 10px;"></div>
+				<!-- Input Area -->
+				<div class="acf-bb-input-wrapper">
+					<div class="acf-bb-input-container">
+						<div class="acf-bb-input-actions-left">
+							<button type="button" id="acf-bb-upload-image" class="acf-bb-icon-btn" title="<?php _e( 'Attach Image', 'acf-block-builder' ); ?>">
+								<span class="dashicons dashicons-paperclip"></span>
+							</button>
+							<button type="button" id="acf-bb-mention-files" class="acf-bb-icon-btn" title="<?php _e( 'Mention Files (@)', 'acf-block-builder' ); ?>">
+								<span class="dashicons dashicons-media-code"></span>
+							</button>
+						</div>
 						
-						<button type="button" id="acf-bb-upload-image" class="button button-icon" title="<?php _e( 'Upload Image', 'acf-block-builder' ); ?>">
-							<span class="dashicons dashicons-format-image"></span>
-						</button>
+						<div class="acf-bb-input-field">
+							<div id="acf-bb-image-preview-mini" class="acf-bb-attachment-preview" style="display: none;"></div>
+							<textarea 
+								id="acf_block_builder_prompt" 
+								name="acf_block_builder_prompt" 
+								rows="1" 
+								placeholder="<?php _e( 'Message AI Block Builder...', 'acf-block-builder' ); ?>"
+								data-placeholder-agent="<?php esc_attr_e( 'Describe your block or request changes...', 'acf-block-builder' ); ?>"
+								data-placeholder-ask="<?php esc_attr_e( 'Ask a question about your block...', 'acf-block-builder' ); ?>"
+							></textarea>
+						</div>
+						
+						<div class="acf-bb-input-actions-right">
+							<button type="button" id="acf-block-builder-generate" class="acf-bb-send-btn" disabled>
+								<span class="dashicons dashicons-arrow-up-alt2"></span>
+							</button>
+						</div>
 					</div>
-					<textarea id="acf_block_builder_prompt" name="acf_block_builder_prompt" rows="1" placeholder="<?php _e( 'Describe your block or requested changes...', 'acf-block-builder' ); ?>"></textarea>
-					<button type="button" id="acf-block-builder-generate" class="button button-primary">
-						<span class="dashicons dashicons-arrow-right-alt2"></span>
-					</button>
 				</div>
+				
+				<!-- Controls Footer - Mode Switcher and Model Selector -->
+				<div class="acf-bb-controls-footer">
+					<div class="acf-bb-controls-left">
+						<div class="acf-bb-mode-switcher">
+							<button type="button" class="acf-bb-mode-btn active" data-mode="agent" title="<?php esc_attr_e( 'Agent Mode - Full code generation and updates', 'acf-block-builder' ); ?>">
+								<span class="dashicons dashicons-admin-tools"></span>
+								<span class="acf-bb-mode-label"><?php _e( 'Agent', 'acf-block-builder' ); ?></span>
+							</button>
+							<button type="button" class="acf-bb-mode-btn" data-mode="ask" title="<?php esc_attr_e( 'Ask Mode - Questions and guidance only', 'acf-block-builder' ); ?>">
+								<span class="dashicons dashicons-format-chat"></span>
+								<span class="acf-bb-mode-label"><?php _e( 'Ask', 'acf-block-builder' ); ?></span>
+							</button>
+						</div>
+					</div>
+					
+					<div class="acf-bb-controls-right">
+						<button type="button" id="acf-bb-clear-history" class="acf-bb-icon-btn" title="<?php esc_attr_e( 'Clear Chat History', 'acf-block-builder' ); ?>">
+							<span class="dashicons dashicons-trash"></span>
+						</button>
+						<div class="acf-bb-model-selector">
+							<button type="button" class="acf-bb-model-trigger" id="acf-bb-model-trigger">
+								<span class="acf-bb-model-icon"></span>
+								<span class="acf-bb-model-name"><?php _e( 'Loading...', 'acf-block-builder' ); ?></span>
+								<span class="dashicons dashicons-arrow-down-alt2"></span>
+							</button>
+							<div class="acf-bb-model-dropdown" id="acf-bb-model-dropdown">
+								<!-- Will be populated by JavaScript -->
+							</div>
+							<select id="acf_block_builder_model" name="acf_block_builder_model" style="display: none;">
+								<option value=""><?php esc_html_e( 'Loading models...', 'acf-block-builder' ); ?></option>
+							</select>
+						</div>
+					</div>
+				</div>
+				
+				<input type="hidden" id="acf_block_builder_image_id" name="acf_block_builder_image_id" value="">
+				<input type="hidden" id="acf_block_builder_mode" name="acf_block_builder_mode" value="agent">
 				<input type="hidden" name="acf_block_builder_chat_history" id="acf_block_builder_chat_history" value="<?php echo esc_attr( $chat_history_json ); ?>">
 			</div>
 			
@@ -1021,6 +1077,7 @@ class ACF_Block_Builder_Meta_Boxes {
 					'export_nonce' => wp_create_nonce( 'acf_block_builder_export' ),
 					'versions_nonce' => wp_create_nonce( 'acf_block_builder_versions' ),
 					'post_id' => $post->ID,
+					'plugin_url' => ACF_BLOCK_BUILDER_URL,
 					'i18n' => array(
 						'version_history' => __( 'Version History', 'acf-block-builder' ),
 						'compare' => __( 'Compare', 'acf-block-builder' ),
