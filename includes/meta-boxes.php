@@ -456,68 +456,79 @@ class ACF_Block_Builder_Meta_Boxes {
 			return;
 		}
 
-		$lines = explode( "\n", $fields_php );
-		$fields = [];
-		$current_field = [];
-		$has_field_started = false;
-
-		foreach ( $lines as $line ) {
-			// Normalize tabs to 4 spaces for consistent calculation
-			$line_content = str_replace( "\t", "    ", $line );
-			$trimmed_line = trim( $line_content );
-
-			// Check for new field start (key)
-			if ( strpos( $trimmed_line, "'key' => 'field_" ) !== false ) {
-				if ( ! empty( $current_field ) && $has_field_started ) {
-					$fields[] = $current_field;
-				}
-				
-				// Calculate indentation level
-				$indent = strlen( $line_content ) - strlen( ltrim( $line_content ) );
-
-				$current_field = [ 'label' => '', 'name' => '', 'type' => '', 'indent' => $indent ];
-				$has_field_started = true;
-			}
-
-			if ( $has_field_started ) {
-				// Extract attributes
-				if ( preg_match( "/'label'\s*=>\s*'([^']*)'/", $trimmed_line, $matches ) ) {
-					$current_field['label'] = $matches[1];
-				}
-				if ( preg_match( "/'name'\s*=>\s*'([^']*)'/", $trimmed_line, $matches ) ) {
-					$current_field['name'] = $matches[1];
-				}
-				if ( preg_match( "/'type'\s*=>\s*'([^']*)'/", $trimmed_line, $matches ) ) {
-					$current_field['type'] = $matches[1];
-				}
-			}
-		}
-		// Add last field
-		if ( ! empty( $current_field ) && $has_field_started ) {
-			$fields[] = $current_field;
-		}
-
+		// Try to get fields from ACF's registry first (more reliable than parsing PHP)
+		$fields = $this->get_fields_from_acf_registry( $fields_php );
+		
 		if ( empty( $fields ) ) {
 			echo '<p>' . __( 'Could not parse fields. Please check the code in fields.php tab.', 'acf-block-builder' ) . '</p>';
 			return;
 		}
 
-		// Calculate base indent
-		$base_indent = 0;
-		if ( ! empty( $fields ) ) {
-			$base_indent = $fields[0]['indent'];
-			foreach ( $fields as $field ) {
-				if ( $field['indent'] < $base_indent ) {
-					$base_indent = $field['indent'];
-				}
-			}
-		}
-
 		echo '<table class="widefat striped acf-bb-fields-table">';
 		echo '<thead><tr><th>' . __( 'Label', 'acf-block-builder' ) . '</th><th>' . __( 'Name', 'acf-block-builder' ) . '</th><th>' . __( 'Type', 'acf-block-builder' ) . '</th></tr></thead>';
 		echo '<tbody>';
+		$this->render_fields_table_rows( $fields, 0 );
+		echo '</tbody>';
+		echo '</table>';
+	}
+
+	/**
+	 * Get fields from ACF registry by executing the PHP code and querying ACF's API.
+	 * This is more reliable than parsing PHP text as it works regardless of formatting.
+	 *
+	 * @param string $fields_php The PHP code containing the field group registration.
+	 * @return array Array of field data from ACF registry.
+	 */
+	private function get_fields_from_acf_registry( $fields_php ) {
+		// Extract the group key from the PHP code
+		$group_key = '';
+		if ( preg_match( "/'key'\s*=>\s*'(group_[a-zA-Z0-9_]+)'/", $fields_php, $matches ) ) {
+			$group_key = $matches[1];
+		}
+
+		if ( empty( $group_key ) || ! function_exists( 'acf_get_fields' ) ) {
+			return [];
+		}
+
+		// Create a temporary file to execute the PHP code
+		$temp_file = wp_tempnam( 'acf_fields_' );
+		if ( ! $temp_file ) {
+			return [];
+		}
+
+		// Write the fields PHP to temp file
+		file_put_contents( $temp_file, $fields_php );
+
+		// Execute the PHP to register the field group with ACF
+		ob_start();
+		try {
+			include $temp_file;
+		} catch ( Exception $e ) {
+			// Ignore errors
+		}
+		ob_end_clean();
+
+		// Clean up temp file
+		@unlink( $temp_file );
+
+		// Now retrieve fields from ACF's local store
+		$fields = acf_get_fields( $group_key );
+
+		if ( ! $fields || ! is_array( $fields ) ) {
+			return [];
+		}
+
+		return $fields;
+	}
+
+	/**
+	 * Recursively render field rows in the table, handling nested sub_fields.
+	 *
+	 * @param array $fields Array of ACF field definitions.
+	 * @param int   $level  Current nesting level for indentation.
+	 */
+	private function render_fields_table_rows( $fields, $level = 0 ) {
 		foreach ( $fields as $field ) {
-			$level = max( 0, ( $field['indent'] - $base_indent ) / 4 ); // Assume 4 space indentation step
 			$padding = $level * 20;
 			$style = $padding > 0 ? 'style="padding-left: ' . ( 10 + $padding ) . 'px;"' : '';
 			$marker = $level > 0 ? '<span class="dashicons dashicons-arrow-return-right" style="font-size: 14px; width: 14px; height: 14px; line-height: 14px; margin-right: 5px;"></span>' : '';
@@ -527,9 +538,28 @@ class ACF_Block_Builder_Meta_Boxes {
 			echo '<td><code>' . esc_html( $field['name'] ?? '' ) . '</code></td>';
 			echo '<td>' . esc_html( $field['type'] ?? '' ) . '</td>';
 			echo '</tr>';
+
+			// Recursively render sub_fields for group, repeater, flexible_content, etc.
+			if ( ! empty( $field['sub_fields'] ) && is_array( $field['sub_fields'] ) ) {
+				$this->render_fields_table_rows( $field['sub_fields'], $level + 1 );
+			}
+
+			// Handle flexible content layouts
+			if ( ! empty( $field['layouts'] ) && is_array( $field['layouts'] ) ) {
+				foreach ( $field['layouts'] as $layout ) {
+					// Render layout as a sub-item
+					echo '<tr>';
+					echo '<td style="padding-left: ' . ( 10 + ( $level + 1 ) * 20 ) . 'px;"><span class="dashicons dashicons-arrow-return-right" style="font-size: 14px; width: 14px; height: 14px; line-height: 14px; margin-right: 5px;"></span><em>' . esc_html( $layout['label'] ?? $layout['name'] ?? '' ) . '</em></td>';
+					echo '<td><code>' . esc_html( $layout['name'] ?? '' ) . '</code></td>';
+					echo '<td><em>layout</em></td>';
+					echo '</tr>';
+
+					if ( ! empty( $layout['sub_fields'] ) && is_array( $layout['sub_fields'] ) ) {
+						$this->render_fields_table_rows( $layout['sub_fields'], $level + 2 );
+					}
+				}
+			}
 		}
-		echo '</tbody>';
-		echo '</table>';
 	}
 
 	public function render_chat_meta_box( $post ) {
