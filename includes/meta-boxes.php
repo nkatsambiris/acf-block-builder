@@ -22,6 +22,9 @@ class ACF_Block_Builder_Meta_Boxes {
 		// Custom Files AJAX handlers
 		add_action( 'wp_ajax_acf_block_builder_add_custom_file', array( $this, 'handle_add_custom_file' ) );
 		add_action( 'wp_ajax_acf_block_builder_delete_custom_file', array( $this, 'handle_delete_custom_file' ) );
+		
+		// Auto-save handler
+		add_action( 'wp_ajax_acf_block_builder_auto_save', array( $this, 'handle_auto_save' ) );
 	}
 
 	public function handle_sync_back() {
@@ -220,6 +223,74 @@ class ACF_Block_Builder_Meta_Boxes {
 		wp_send_json_success( array(
 			'file_id' => $file_id,
 			'message' => 'File deleted successfully.',
+		) );
+	}
+
+	/**
+	 * AJAX handler for auto-saving post meta after AI changes are applied.
+	 * This saves the block code and chat history without requiring a full page save.
+	 */
+	public function handle_auto_save() {
+		check_ajax_referer( 'acf_block_builder_save', 'nonce' );
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( 'Permission denied.' );
+		}
+
+		$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+
+		if ( ! $post_id ) {
+			wp_send_json_error( 'Invalid Post ID.' );
+		}
+
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			wp_send_json_error( 'Permission denied for this post.' );
+		}
+
+		$saved_fields = array();
+
+		// Save main code fields
+		$fields = array(
+			'json'    => 'acf_block_builder_json',
+			'php'     => 'acf_block_builder_php',
+			'css'     => 'acf_block_builder_css',
+			'js'      => 'acf_block_builder_js',
+			'fields'  => 'acf_block_builder_fields',
+			'assets'  => 'acf_block_builder_assets',
+			'chat_history' => 'acf_block_builder_chat_history',
+		);
+
+		foreach ( $fields as $key => $field ) {
+			if ( isset( $_POST[ $field ] ) ) {
+				update_post_meta( $post_id, '_' . $field, wp_unslash( $_POST[ $field ] ) );
+				$saved_fields[] = $key;
+			}
+		}
+
+		// Save custom files if provided
+		if ( isset( $_POST['custom_files'] ) ) {
+			$custom_files_json = wp_unslash( $_POST['custom_files'] );
+			$custom_files = json_decode( $custom_files_json, true );
+			
+			if ( is_array( $custom_files ) ) {
+				// Use wp_slash() to preserve JSON escape sequences since update_post_meta() calls wp_unslash()
+				update_post_meta( $post_id, '_acf_block_builder_custom_files', wp_slash( wp_json_encode( $custom_files ) ) );
+				$saved_fields[] = 'custom_files';
+			}
+		}
+
+		// Regenerate block files on disk
+		$this->generate_block_files( $post_id );
+
+		// Save file versions
+		if ( class_exists( 'ACF_Block_Builder_File_Versions' ) ) {
+			$versions_handler = new ACF_Block_Builder_File_Versions();
+			$versions_handler->save_file_versions( $post_id );
+		}
+
+		wp_send_json_success( array(
+			'message' => 'Auto-saved successfully.',
+			'saved_fields' => $saved_fields,
 		) );
 	}
 
@@ -570,7 +641,7 @@ class ACF_Block_Builder_Meta_Boxes {
 			<div id="acf-bb-diff-overlay" class="acf-bb-overlay" style="display: none;">
 				<div class="acf-bb-overlay-content acf-bb-diff-content">
 					<div class="acf-bb-diff-header">
-						<h3><?php _e( 'Review AI Changes', 'acf-block-builder' ); ?></h3>
+						<h3><?php _e( 'Review Changes', 'acf-block-builder' ); ?></h3>
 						<div class="acf-bb-diff-actions">
 							<button type="button" id="acf-bb-diff-cancel" class="button button-secondary"><?php _e( 'Discard', 'acf-block-builder' ); ?></button>
 							<button type="button" id="acf-bb-diff-apply-all" class="button button-primary" style="margin-right: 5px;"><?php _e( 'Apply All', 'acf-block-builder' ); ?></button>
@@ -752,7 +823,7 @@ class ACF_Block_Builder_Meta_Boxes {
 				<input type="hidden" name="acf_block_builder_custom_files" id="acf-bb-custom-files" value="<?php echo esc_attr( $custom_files_json ); ?>" />
 				
 				<!-- Problems Panel -->
-				<div class="acf-bb-problems-panel" id="acf-bb-problems-panel">
+				<div class="acf-bb-problems-panel collapsed" id="acf-bb-problems-panel">
 					<div class="acf-bb-problems-header">
 						<button type="button" class="acf-bb-problems-toggle" id="acf-bb-problems-toggle">
 							<span class="dashicons dashicons-warning"></span>
@@ -1384,6 +1455,7 @@ class ACF_Block_Builder_Meta_Boxes {
 					'nonce'    => wp_create_nonce( 'acf_block_builder_ai' ),
 					'export_nonce' => wp_create_nonce( 'acf_block_builder_export' ),
 					'versions_nonce' => wp_create_nonce( 'acf_block_builder_versions' ),
+					'save_nonce' => wp_create_nonce( 'acf_block_builder_save' ),
 					'post_id' => $post->ID,
 					'plugin_url' => ACF_BLOCK_BUILDER_URL,
 					'i18n' => array(

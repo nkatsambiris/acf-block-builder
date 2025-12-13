@@ -348,7 +348,7 @@ class ACF_Block_Builder_AI {
 		
 		JAVASCRIPT / TS-IGNORE BEST PRACTICES:
 		- When accessing WordPress/ACF/jQuery globals, use // @ts-ignore immediately above that line.
-		- Use @ts-ignore only for known WP/plugin globals (window.acf, window.jQuery, jQuery).
+		- Use @ts-ignore only for known WP/plugin globals (window.acf, window.jQuery, jQuery, block).
 		
 		FILE REFERENCES IN CHAT/SUMMARY:
 		- When mentioning files in CHAT or SUMMARY, always wrap names in backticks (e.g. `block.json`, `render.php`).

@@ -479,6 +479,97 @@ jQuery(document).ready(function($) {
         $('#acf_block_builder_chat_history').val(JSON.stringify(chatHistory));
     }
 
+    /**
+     * Auto-save post meta data to the server.
+     * Called after AI changes are applied to persist code changes and chat history.
+     */
+    function autoSavePost() {
+        // Collect all editor content
+        var data = {
+            action: 'acf_block_builder_auto_save',
+            nonce: acfBlockBuilder.save_nonce,
+            post_id: acfBlockBuilder.post_id,
+            acf_block_builder_chat_history: JSON.stringify(chatHistory)
+        };
+        
+        // Collect main editor content
+        if (editors['json']) {
+            data.acf_block_builder_json = editors['json'].getValue();
+        }
+        if (editors['php']) {
+            data.acf_block_builder_php = editors['php'].getValue();
+        }
+        if (editors['css']) {
+            data.acf_block_builder_css = editors['css'].getValue();
+        }
+        if (editors['js']) {
+            data.acf_block_builder_js = editors['js'].getValue();
+        }
+        if (editors['fields']) {
+            data.acf_block_builder_fields = editors['fields'].getValue();
+        }
+        if (editors['assets']) {
+            data.acf_block_builder_assets = editors['assets'].getValue();
+        }
+        
+        // Collect custom files
+        var customFiles = {};
+        Object.keys(editors).forEach(function(tabId) {
+            if (tabId.startsWith('custom-')) {
+                var fileId = tabId.replace('custom-', '').replace(/-/g, '_');
+                var $tab = $('[data-diff-tab="' + tabId + '"]');
+                var filename = $tab.text().trim().replace(/[\s\S]*?([^\s]+)$/, '$1'); // Get filename from tab
+                
+                // Get proper filename from the tab's data or text
+                var tabFilename = $tab.find('.acf-bb-tab-name').text() || $tab.text().split('\n')[0].trim();
+                
+                customFiles[fileId] = {
+                    filename: tabFilename,
+                    content: editors[tabId].getValue()
+                };
+            }
+        });
+        
+        if (Object.keys(customFiles).length > 0) {
+            data.custom_files = JSON.stringify(customFiles);
+        }
+        
+        $.ajax({
+            url: acfBlockBuilder.ajax_url,
+            type: 'POST',
+            data: data,
+            success: function(response) {
+                if (response.success) {
+                    // Show brief save confirmation
+                    showSaveNotification('Changes saved');
+                } else {
+                    console.error('Auto-save failed:', response.data);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Auto-save error:', error);
+            }
+        });
+    }
+    
+    /**
+     * Show a brief notification that changes were saved.
+     */
+    function showSaveNotification(message) {
+        var $notification = $('#acf-bb-save-notification');
+        
+        if (!$notification.length) {
+            $notification = $('<div id="acf-bb-save-notification" class="acf-bb-save-notification"></div>');
+            $('body').append($notification);
+        }
+        
+        $notification.text(message).addClass('visible');
+        
+        setTimeout(function() {
+            $notification.removeClass('visible');
+        }, 2000);
+    }
+
     function scrollToBottom() {
         var $chat = $('#acf-bb-chat-messages');
         if ($chat.length) {
@@ -2587,6 +2678,9 @@ jQuery(document).ready(function($) {
         pendingAIChanges = {};
         fileAcceptanceStatus = {};
         changedFileTabs = [];
+        
+        // Auto-save to persist changes
+        autoSavePost();
     });
 
     // Apply Changes - only applies accepted or pending (not rejected) files
@@ -2648,6 +2742,11 @@ jQuery(document).ready(function($) {
         pendingAIChanges = {};
         fileAcceptanceStatus = {};
         changedFileTabs = [];
+        
+        // Auto-save to persist changes
+        if (appliedFiles.length > 0) {
+            autoSavePost();
+        }
     });
 
     // Discard Changes
@@ -2841,6 +2940,9 @@ jQuery(document).ready(function($) {
         }
         
         appendMessage('user', displayMessage, imageUrl, false, null, savedAttachedTokens, savedStructuredContent);
+        
+        // Auto-save after user submits a message
+        autoSavePost();
         
         // Clear input - clear contenteditable editor and textarea
         if (window.MentionAutocomplete) {
@@ -3383,6 +3485,9 @@ jQuery(document).ready(function($) {
             
             chatHistory.push(historyEntry);
             saveChatHistory();
+            
+            // Auto-save after AI completes message
+            autoSavePost();
             
             // Only trigger Diff View in Agent mode
             if (currentResponseMode === 'agent') {

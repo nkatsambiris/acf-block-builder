@@ -818,7 +818,7 @@
     justify-content: center;
     gap: 8px;
     padding: 20px;
-    color: #50575e;
+    color: #fff;
     font-size: 13px;
 }
 
@@ -2782,4 +2782,35 @@
 .acf-bb-error-chip:hover::after {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+}
+
+/* Auto-save notification */
+.acf-bb-save-notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #1d2327;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: none;
+    z-index: 100000;
+}
+
+.acf-bb-save-notification.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.acf-bb-save-notification::before {
+    content: '\f147';
+    font-family: dashicons;
+    margin-right: 8px;
+    color: #46b450;
 }
