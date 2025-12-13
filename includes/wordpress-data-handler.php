@@ -27,6 +27,7 @@ class ACF_Block_Builder_WordPress_Data {
 			'taxonomies'  => $this->get_taxonomies(),
 			'fieldGroups' => $this->get_field_groups(),
 			'fields'      => $this->get_fields(),
+			'posts'       => $this->get_posts_by_type(),
 		);
 
 		wp_send_json_success( $data );
@@ -67,6 +68,67 @@ class ACF_Block_Builder_WordPress_Data {
 				'supports'     => $supports,
 				'taxonomies'   => $taxonomies,
 				'rest_base'    => $post_type->rest_base ?: $post_type->name,
+			);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Get posts grouped by post type for nested navigation.
+	 * 
+	 * @return array Array of posts grouped by post type
+	 */
+	private function get_posts_by_type() {
+		$post_types = get_post_types(
+			array(
+				'public' => true,
+			),
+			'objects'
+		);
+
+		$result = array();
+
+		foreach ( $post_types as $post_type ) {
+			// Skip attachments for now - handle separately for better UX
+			$posts_per_page = $post_type->name === 'attachment' ? 50 : 100;
+			
+			$query_args = array(
+				'post_type'      => $post_type->name,
+				'posts_per_page' => $posts_per_page,
+				'post_status'    => $post_type->name === 'attachment' ? 'inherit' : 'publish',
+				'orderby'        => 'title',
+				'order'          => 'ASC',
+			);
+
+			$posts = get_posts( $query_args );
+			$post_list = array();
+
+			foreach ( $posts as $post ) {
+				$post_data = array(
+					'id'    => $post->ID,
+					'title' => $post->post_title ?: '(No title)',
+					'slug'  => $post->post_name,
+					'url'   => get_permalink( $post->ID ),
+				);
+
+				// Add thumbnail for attachments
+				if ( $post_type->name === 'attachment' ) {
+					$post_data['mime_type'] = $post->post_mime_type;
+					$thumb_url = wp_get_attachment_image_url( $post->ID, 'thumbnail' );
+					if ( $thumb_url ) {
+						$post_data['thumbnail'] = $thumb_url;
+					}
+				}
+
+				$post_list[] = $post_data;
+			}
+
+			$result[ $post_type->name ] = array(
+				'label'  => $post_type->label,
+				'singular' => $post_type->labels->singular_name,
+				'posts'  => $post_list,
+				'count'  => wp_count_posts( $post_type->name )->publish ?? count( $post_list ),
 			);
 		}
 

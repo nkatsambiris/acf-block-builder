@@ -30,6 +30,7 @@
         wpDataLoading: false,
         wpDataLoaded: false,
         currentCategory: null, // For nested navigation (field_group, field)
+        currentPostType: null, // For drilling into individual posts within a post type
         isScrolling: false // Prevents mouseenter selection during scroll
     };
 
@@ -78,12 +79,12 @@
     function getAvailableFiles() {
         // Core files
         var files = [
-            { id: 'block.json', label: 'block.json', icon: 'media-code', tabId: 'block-json' },
-            { id: 'render.php', label: 'render.php', icon: 'editor-code', tabId: 'render-php' },
-            { id: 'style.css', label: 'style.css', icon: 'art', tabId: 'style-css' },
-            { id: 'script.js', label: 'script.js', icon: 'media-default', tabId: 'script-js' },
-            { id: 'fields.php', label: 'fields.php', icon: 'database', tabId: 'fields-php' },
-            { id: 'assets.php', label: 'assets.php', icon: 'admin-links', tabId: 'assets-php' }
+            { id: 'block.json', label: 'block.json', icon: 'media-code', tabId: 'block-json', type: 'file' },
+            { id: 'render.php', label: 'render.php', icon: 'editor-code', tabId: 'render-php', type: 'file' },
+            { id: 'style.css', label: 'style.css', icon: 'art', tabId: 'style-css', type: 'file' },
+            { id: 'script.js', label: 'script.js', icon: 'media-default', tabId: 'script-js', type: 'file' },
+            { id: 'fields.php', label: 'fields.php', icon: 'database', tabId: 'fields-php', type: 'file' },
+            { id: 'assets.php', label: 'assets.php', icon: 'admin-links', tabId: 'assets-php', type: 'file' }
         ];
         
         // Add custom files from the hidden field
@@ -113,7 +114,8 @@
                                 id: fileData.filename,
                                 label: fileData.filename,
                                 icon: icon,
-                                tabId: tabId
+                                tabId: tabId,
+                                type: 'file'
                             });
                         }
                     });
@@ -188,12 +190,37 @@
             // Add post types
             if (state.wpData.postTypes) {
                 state.wpData.postTypes.forEach(function(postType) {
+                    // Get post count from posts data if available
+                    var postCount = 0;
+                    if (state.wpData.posts && state.wpData.posts[postType.id]) {
+                        postCount = state.wpData.posts[postType.id].posts.length;
+                    }
+                    
                     items.push({
                         id: 'pt_' + postType.id,
                         label: postType.label,
-                        icon: 'admin-post',
+                        icon: getPostTypeIcon(postType.id),
                         type: 'post_type',
-                        data: postType
+                        data: Object.assign({}, postType, { postCount: postCount })
+                    });
+                });
+            }
+            
+            // Add individual posts (for search and nested navigation)
+            if (state.wpData.posts) {
+                Object.keys(state.wpData.posts).forEach(function(postTypeId) {
+                    var postTypeData = state.wpData.posts[postTypeId];
+                    postTypeData.posts.forEach(function(post) {
+                        items.push({
+                            id: 'post_' + post.id,
+                            label: post.title,
+                            icon: getPostTypeIcon(postTypeId),
+                            type: 'post_item',
+                            data: Object.assign({}, post, { 
+                                postType: postTypeId,
+                                postTypeLabel: postTypeData.singular || postTypeData.label
+                            })
+                        });
                     });
                 });
             }
@@ -239,6 +266,17 @@
         }
         
         return items;
+    }
+    
+    function getPostTypeIcon(postTypeId) {
+        var icons = {
+            'post': 'admin-post',
+            'page': 'admin-page',
+            'attachment': 'admin-media',
+            'product': 'cart',
+            'movie': 'video-alt2'
+        };
+        return icons[postTypeId] || 'admin-post';
     }
     
     function filterItems(searchText) {
@@ -299,6 +337,7 @@
         var grouped = {
             file: [],
             post_type: [],
+            post_item: [],
             taxonomy: [],
             field_group: [],
             field: [],
@@ -329,6 +368,49 @@
                label.substring(index + search.length);
     }
     
+    function renderItemHtml(item, isSelected, currentIndex, searchText) {
+        var classes = 'acf-bb-mention-item';
+        if (isSelected) classes += ' selected';
+        
+        var html = '<div class="' + classes + '" data-item-id="' + item.id + '" data-index="' + currentIndex + '">';
+        html += '<span class="dashicons dashicons-' + item.icon + '"></span>';
+        
+        // Add type badge based on item type
+        var badge = getItemBadge(item);
+        if (badge) {
+            html += '<span class="acf-bb-mention-field-group-badge">' + escapeAttr(badge) + '</span>';
+        }
+        
+        var labelHtml = searchText ? highlightMatch(item.label, searchText) : item.label;
+        html += '<span class="acf-bb-mention-label">' + labelHtml + '</span>';
+        html += '</div>';
+        
+        return html;
+    }
+    
+    function getItemBadge(item) {
+        switch (item.type) {
+            case 'field':
+                // Show parent field group name
+                return item.data && item.data.parentTitle ? item.data.parentTitle : null;
+            case 'post_item':
+                // Show post type label
+                return item.data && item.data.postTypeLabel ? item.data.postTypeLabel : null;
+            case 'file':
+                return 'File';
+            case 'field_group':
+                return 'Field Group';
+            case 'field_type':
+                return 'Field Type';
+            case 'post_type':
+                return 'Post Type';
+            case 'taxonomy':
+                return 'Taxonomy';
+            default:
+                return null;
+        }
+    }
+    
     function escapeAttr(str) {
         if (!str) return '';
         return str.replace(/&/g, '&amp;')
@@ -349,8 +431,11 @@
         html += '<input type="text" class="acf-bb-mention-search-input" placeholder="Search..." value="' + escapeAttr(state.filterText) + '" />';
         html += '</div>';
         
-        // Check if we're in a category detail view
-        if (state.currentCategory && !state.filterText) {
+        // Check if we're drilling into a specific post type
+        if (state.currentPostType && !state.filterText) {
+            html += renderPostTypeDetail(items);
+        } else if (state.currentCategory && !state.filterText) {
+            // Check if we're in a category detail view
             html += renderCategoryDetail(items);
         } else if (items.length === 0) {
             if (state.wpDataLoading) {
@@ -409,11 +494,68 @@
             output += '<div class="acf-bb-mention-list">';
             categoryItems.forEach(function(item) {
                 var isSelected = currentIndex === state.selectedIndex;
+                
+                // For post_type items, render as folder to drill into individual posts
+                if (item.type === 'post_type' && item.data && item.data.postCount > 0) {
+                    var classes = 'acf-bb-mention-item acf-bb-mention-folder';
+                    if (isSelected) classes += ' selected';
+                    
+                    output += '<div class="' + classes + '" data-post-type-id="' + item.data.id + '" data-index="' + currentIndex + '">';
+                    output += '<span class="dashicons dashicons-' + item.icon + '"></span>';
+                    output += '<span class="acf-bb-mention-label">' + item.label + '</span>';
+                    output += '<span class="acf-bb-mention-folder-count">(' + item.data.postCount + ')</span>';
+                    output += '<span class="dashicons dashicons-arrow-right-alt2 acf-bb-folder-arrow"></span>';
+                    output += '</div>';
+                } else {
+                    output += renderItemHtml(item, isSelected, currentIndex, '');
+                }
+                currentIndex++;
+            });
+            output += '</div>';
+            
+            return output;
+        }
+        
+        // Helper function for post type detail view (individual posts)
+        function renderPostTypeDetail(allItems) {
+            var output = '';
+            var postTypeId = state.currentPostType;
+            var postTypeLabel = 'Posts';
+            var postTypeIcon = getPostTypeIcon(postTypeId);
+            
+            // Get post type info
+            if (state.wpData && state.wpData.posts && state.wpData.posts[postTypeId]) {
+                postTypeLabel = state.wpData.posts[postTypeId].label;
+            }
+            
+            // Get posts for this post type
+            var posts = allItems.filter(function(item) {
+                return item.type === 'post_item' && item.data && item.data.postType === postTypeId;
+            });
+            
+            // Back button
+            var isBackSelected = currentIndex === state.selectedIndex;
+            var backClasses = 'acf-bb-mention-item acf-bb-mention-back';
+            if (isBackSelected) backClasses += ' selected';
+            
+            output += '<div class="' + backClasses + '" data-action="back-from-posttype" data-index="' + currentIndex + '">';
+            output += '<span class="dashicons dashicons-arrow-left-alt2"></span>';
+            output += '<span class="acf-bb-mention-label">Back</span>';
+            output += '</div>';
+            currentIndex++;
+            
+            // Header
+            output += '<div class="acf-bb-mention-header">' + postTypeLabel + ' (' + posts.length + ')</div>';
+            
+            // All posts
+            output += '<div class="acf-bb-mention-list">';
+            posts.forEach(function(item) {
+                var isSelected = currentIndex === state.selectedIndex;
                 var classes = 'acf-bb-mention-item';
                 if (isSelected) classes += ' selected';
                 
                 output += '<div class="' + classes + '" data-item-id="' + item.id + '" data-index="' + currentIndex + '">';
-                output += '<span class="dashicons dashicons-' + item.icon + '"></span>';
+                output += '<span class="dashicons dashicons-' + postTypeIcon + '"></span>';
                 output += '<span class="acf-bb-mention-label">' + item.label + '</span>';
                 output += '</div>';
                 
@@ -470,14 +612,21 @@
                     // Show all items (since we're under the threshold)
                     categoryItems.forEach(function(item) {
                         var isSelected = currentIndex === state.selectedIndex;
-                        var classes = 'acf-bb-mention-item';
-                        if (isSelected) classes += ' selected';
                         
-                        output += '<div class="' + classes + '" data-item-id="' + item.id + '" data-index="' + currentIndex + '">';
-                        output += '<span class="dashicons dashicons-' + item.icon + '"></span>';
-                        output += '<span class="acf-bb-mention-label">' + item.label + '</span>';
-                        output += '</div>';
-                        
+                        // For post_type items, render as folder to drill into individual posts
+                        if (item.type === 'post_type' && item.data && item.data.postCount > 0) {
+                            var classes = 'acf-bb-mention-item acf-bb-mention-folder';
+                            if (isSelected) classes += ' selected';
+                            
+                            output += '<div class="' + classes + '" data-post-type-id="' + item.data.id + '" data-index="' + currentIndex + '">';
+                            output += '<span class="dashicons dashicons-' + item.icon + '"></span>';
+                            output += '<span class="acf-bb-mention-label">' + item.label + '</span>';
+                            output += '<span class="acf-bb-mention-folder-count">(' + item.data.postCount + ')</span>';
+                            output += '<span class="dashicons dashicons-arrow-right-alt2 acf-bb-folder-arrow"></span>';
+                            output += '</div>';
+                        } else {
+                            output += renderItemHtml(item, isSelected, currentIndex, '');
+                        }
                         currentIndex++;
                     });
                     
@@ -495,6 +644,7 @@
             
             var categories = [
                 { key: 'file', label: 'Files' },
+                { key: 'post_item', label: 'Posts & Pages' },
                 { key: 'post_type', label: 'Post Types' },
                 { key: 'taxonomy', label: 'Taxonomies' },
                 { key: 'field_group', label: 'Field Groups' },
@@ -510,14 +660,7 @@
                     
                     categoryItems.forEach(function(item) {
                         var isSelected = currentIndex === state.selectedIndex;
-                        var classes = 'acf-bb-mention-item';
-                        if (isSelected) classes += ' selected';
-                        
-                        output += '<div class="' + classes + '" data-item-id="' + item.id + '" data-index="' + currentIndex + '">';
-                        output += '<span class="dashicons dashicons-' + item.icon + '"></span>';
-                        output += '<span class="acf-bb-mention-label">' + highlightMatch(item.label, state.filterText) + '</span>';
-                        output += '</div>';
-                        
+                        output += renderItemHtml(item, isSelected, currentIndex, state.filterText);
                         currentIndex++;
                     });
                     
@@ -536,7 +679,13 @@
         var count = 0;
         var FOLDER_THRESHOLD = 7;
         
-        if (state.currentCategory && !state.filterText) {
+        if (state.currentPostType && !state.filterText) {
+            // In post type detail: back button + posts
+            var posts = items.filter(function(item) {
+                return item.type === 'post_item' && item.data && item.data.postType === state.currentPostType;
+            });
+            count = 1 + posts.length;
+        } else if (state.currentCategory && !state.filterText) {
             // In category detail: back button + category items
             count = 1 + (grouped[state.currentCategory] || []).length;
         } else if (!state.filterText) {
@@ -600,6 +749,7 @@
         var items = filterItems(state.filterText);
         state.selectedIndex = 0;
         state.currentCategory = null;
+        state.currentPostType = null;
         
         renderDropdown(items);
         positionDropdown();
@@ -614,6 +764,7 @@
         state.filterText = '';
         state.mentionRange = null;
         state.currentCategory = null;
+        state.currentPostType = null;
         state.isScrolling = false;
     }
 
@@ -1050,7 +1201,7 @@
         var hasFiles = tokens.some(function(t) { return t.type === 'file'; });
         var hasErrors = tokens.some(function(t) { return t.type === 'error'; });
         var hasWPData = tokens.some(function(t) { 
-            return ['post_type', 'taxonomy', 'field_group', 'field', 'field_type'].indexOf(t.type) !== -1;
+            return ['post_type', 'taxonomy', 'field_group', 'field', 'field_type', 'post_item'].indexOf(t.type) !== -1;
         });
         
         // Handle error tokens
@@ -1077,6 +1228,8 @@
             tokens.forEach(function(token) {
                 if (token.type === 'post_type') {
                     context += formatPostTypeContext(token.data);
+                } else if (token.type === 'post_item') {
+                    context += formatPostItemContext(token.data, token.label);
                 } else if (token.type === 'taxonomy') {
                     context += formatTaxonomyContext(token.data);
                 } else if (token.type === 'field_group') {
@@ -1132,6 +1285,23 @@
         
         if (postType.description) {
             context += '- Description: ' + postType.description + '\n';
+        }
+        
+        context += '\n';
+        return context;
+    }
+    
+    function formatPostItemContext(postData, label) {
+        var context = '[' + (postData.postTypeLabel || 'POST').toUpperCase() + ': ' + label + ']\n';
+        context += '- ID: ' + postData.id + '\n';
+        context += '- Slug: ' + postData.slug + '\n';
+        
+        if (postData.url) {
+            context += '- URL: ' + postData.url + '\n';
+        }
+        
+        if (postData.mime_type) {
+            context += '- Mime Type: ' + postData.mime_type + '\n';
         }
         
         context += '\n';
@@ -1359,8 +1529,13 @@
                 if ($selected.hasClass('acf-bb-mention-folder')) {
                     e.preventDefault();
                     var categoryKey = $selected.data('category-key');
+                    var postTypeId = $selected.data('post-type-id');
                     if (categoryKey) {
                         state.currentCategory = categoryKey;
+                        state.selectedIndex = 0;
+                        updateDropdown();
+                    } else if (postTypeId) {
+                        state.currentPostType = postTypeId;
                         state.selectedIndex = 0;
                         updateDropdown();
                     }
@@ -1368,8 +1543,14 @@
                 break;
                 
             case 'ArrowLeft':
-                // Go back if in category detail view
-                if (state.currentCategory) {
+                // Go back if in post type detail view
+                if (state.currentPostType) {
+                    e.preventDefault();
+                    state.currentPostType = null;
+                    state.selectedIndex = 0;
+                    updateDropdown();
+                } else if (state.currentCategory) {
+                    // Go back if in category detail view
                     e.preventDefault();
                     state.currentCategory = null;
                     state.selectedIndex = 0;
@@ -1382,9 +1563,17 @@
                 e.preventDefault();
                 var $selected = $(config.dropdownSelector).find('.acf-bb-mention-item.selected');
                 
-                // Handle back button
+                // Handle back button from category
                 if ($selected.data('action') === 'back') {
                     state.currentCategory = null;
+                    state.selectedIndex = 0;
+                    updateDropdown();
+                    return;
+                }
+                
+                // Handle back button from post type
+                if ($selected.data('action') === 'back-from-posttype') {
+                    state.currentPostType = null;
                     state.selectedIndex = 0;
                     updateDropdown();
                     return;
@@ -1393,12 +1582,24 @@
                 // Handle folder navigation
                 if ($selected.hasClass('acf-bb-mention-folder')) {
                     var categoryKey = $selected.data('category-key');
+                    var postTypeId = $selected.data('post-type-id');
+                    
+                    // Category folders drill in on Enter
                     if (categoryKey) {
                         state.currentCategory = categoryKey;
                         state.selectedIndex = 0;
                         updateDropdown();
+                        return;
                     }
-                    return;
+                    
+                    // Post type folders: Enter selects the post type (use ArrowRight to drill in)
+                    if (postTypeId) {
+                        var item = items.find(function(i) { return i.id === 'pt_' + postTypeId; });
+                        if (item) {
+                            selectItem(item);
+                        }
+                        return;
+                    }
                 }
                 
                 // Handle regular item selection
@@ -1413,8 +1614,13 @@
                 
             case 'Escape':
                 e.preventDefault();
-                // If in category, go back first
-                if (state.currentCategory) {
+                // If in post type detail, go back first
+                if (state.currentPostType) {
+                    state.currentPostType = null;
+                    state.selectedIndex = 0;
+                    updateDropdown();
+                } else if (state.currentCategory) {
+                    // If in category, go back
                     state.currentCategory = null;
                     state.selectedIndex = 0;
                     updateDropdown();
@@ -1474,8 +1680,9 @@
             e.stopPropagation();
             
             var $this = $(this);
+            var $target = $(e.target);
             
-            // Handle back button
+            // Handle back button from category
             if ($this.data('action') === 'back') {
                 state.currentCategory = null;
                 state.selectedIndex = 0;
@@ -1483,15 +1690,46 @@
                 return;
             }
             
-            // Handle folder navigation
+            // Handle back button from post type
+            if ($this.data('action') === 'back-from-posttype') {
+                state.currentPostType = null;
+                state.selectedIndex = 0;
+                updateDropdown();
+                return;
+            }
+            
+            // Check if clicking on the folder arrow specifically
+            var clickedArrow = $target.hasClass('acf-bb-folder-arrow') || $target.closest('.acf-bb-folder-arrow').length > 0;
+            
+            // Handle folder navigation (category folders always drill in, post type folders only on arrow click)
             if ($this.hasClass('acf-bb-mention-folder')) {
                 var categoryKey = $this.data('category-key');
+                var postTypeId = $this.data('post-type-id');
+                
+                // Category folders always drill in
                 if (categoryKey) {
                     state.currentCategory = categoryKey;
                     state.selectedIndex = 0;
                     updateDropdown();
+                    return;
                 }
-                return;
+                
+                // Post type folders: arrow drills in, otherwise select the post type
+                if (postTypeId) {
+                    if (clickedArrow) {
+                        state.currentPostType = postTypeId;
+                        state.selectedIndex = 0;
+                        updateDropdown();
+                        return;
+                    }
+                    // Fall through to select the post type as an item
+                    var items = getAvailableItems();
+                    var item = items.find(function(i) { return i.id === 'pt_' + postTypeId; });
+                    if (item) {
+                        selectItem(item);
+                    }
+                    return;
+                }
             }
             
             // Handle regular item selection
@@ -1559,9 +1797,18 @@
                     e.preventDefault();
                     var $selected = $(config.dropdownSelector).find('.acf-bb-mention-item.selected');
                     
-                    // Handle back button
+                    // Handle back button from category
                     if ($selected.data('action') === 'back') {
                         state.currentCategory = null;
+                        state.selectedIndex = 0;
+                        updateDropdown();
+                        $(config.dropdownSelector).find('.acf-bb-mention-search-input').focus();
+                        return;
+                    }
+                    
+                    // Handle back button from post type
+                    if ($selected.data('action') === 'back-from-posttype') {
+                        state.currentPostType = null;
                         state.selectedIndex = 0;
                         updateDropdown();
                         $(config.dropdownSelector).find('.acf-bb-mention-search-input').focus();
@@ -1571,13 +1818,25 @@
                     // Handle folder navigation
                     if ($selected.hasClass('acf-bb-mention-folder')) {
                         var categoryKey = $selected.data('category-key');
+                        var postTypeId = $selected.data('post-type-id');
+                        
+                        // Category folders drill in on Enter
                         if (categoryKey) {
                             state.currentCategory = categoryKey;
                             state.selectedIndex = 0;
                             updateDropdown();
                             $(config.dropdownSelector).find('.acf-bb-mention-search-input').focus();
+                            return;
                         }
-                        return;
+                        
+                        // Post type folders: Enter selects the post type (use ArrowRight to drill in)
+                        if (postTypeId) {
+                            var item = items.find(function(i) { return i.id === 'pt_' + postTypeId; });
+                            if (item) {
+                                selectItem(item);
+                            }
+                            return;
+                        }
                     }
                     
                     // Handle regular item selection
@@ -1592,7 +1851,12 @@
                     
                 case 'Escape':
                     e.preventDefault();
-                    if (state.currentCategory) {
+                    if (state.currentPostType) {
+                        state.currentPostType = null;
+                        state.selectedIndex = 0;
+                        updateDropdown();
+                        $(config.dropdownSelector).find('.acf-bb-mention-search-input').focus();
+                    } else if (state.currentCategory) {
                         state.currentCategory = null;
                         state.selectedIndex = 0;
                         updateDropdown();
@@ -1608,8 +1872,14 @@
                     if ($selected.hasClass('acf-bb-mention-folder')) {
                         e.preventDefault();
                         var categoryKey = $selected.data('category-key');
+                        var postTypeId = $selected.data('post-type-id');
                         if (categoryKey) {
                             state.currentCategory = categoryKey;
+                            state.selectedIndex = 0;
+                            updateDropdown();
+                            $(config.dropdownSelector).find('.acf-bb-mention-search-input').focus();
+                        } else if (postTypeId) {
+                            state.currentPostType = postTypeId;
                             state.selectedIndex = 0;
                             updateDropdown();
                             $(config.dropdownSelector).find('.acf-bb-mention-search-input').focus();
@@ -1618,9 +1888,13 @@
                     break;
                     
                 case 'ArrowLeft':
-                    if (state.currentCategory && $(this).val() === '') {
+                    if ((state.currentPostType || state.currentCategory) && $(this).val() === '') {
                         e.preventDefault();
-                        state.currentCategory = null;
+                        if (state.currentPostType) {
+                            state.currentPostType = null;
+                        } else {
+                            state.currentCategory = null;
+                        }
                         state.selectedIndex = 0;
                         updateDropdown();
                         $(config.dropdownSelector).find('.acf-bb-mention-search-input').focus();
