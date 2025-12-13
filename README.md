@@ -11,6 +11,13 @@ A WordPress plugin that allows you to create and manage ACF Blocks using AI and 
 3. Enter your API key and configure your settings
 4. Start generating new ACF Blocks
 
+## Version 1.7.0 Changes
+- UPDATE: Improvements to @mentions
+- FIX: Improvements to fields list preview
+- NEW: Autosave code completions
+- NEW: Autosave chat histories
+- FIX: Improvements to managing custom files in chat
+
 ## Version 1.6.0 Changes
 - UPDATE: Ability to stop AI generation
 - UPDATE: Improvements to AI prompting
