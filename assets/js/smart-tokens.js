@@ -327,6 +327,37 @@
     }
 
     /**
+     * Register a single custom file in the files registry.
+     * Used for dynamically created custom files.
+     * 
+     * @param {string} filename - The filename (e.g., 'readme.txt')
+     * @param {string} tabId - The tab ID (e.g., 'custom-readme-txt')
+     */
+    function registerCustomFile(filename, tabId) {
+        if (tokenRegistry.files[filename]) {
+            return; // Already registered
+        }
+        
+        // Determine icon based on file extension
+        var ext = filename.split('.').pop().toLowerCase();
+        var iconMap = {
+            'php': 'editor-code',
+            'js': 'media-default',
+            'css': 'art',
+            'json': 'media-code',
+            'html': 'media-text',
+            'txt': 'text-page'
+        };
+        
+        tokenRegistry.files[filename] = {
+            tabId: tabId,
+            icon: iconMap[ext] || 'media-text',
+            label: filename,
+            type: ext
+        };
+    }
+
+    /**
      * Get the token registry (for debugging/extension).
      * 
      * @returns {Object} The token registry
@@ -347,6 +378,7 @@
         renderTokenChip: renderTokenChip,
         switchToTab: switchToTab,
         registerTokens: registerTokens,
+        registerCustomFile: registerCustomFile,
         getRegistry: getRegistry
     };
 

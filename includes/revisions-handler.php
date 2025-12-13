@@ -14,6 +14,7 @@ class ACF_Block_Builder_Revisions {
 		'_acf_block_builder_fields',
 		'_acf_block_builder_assets',
 		'_acf_block_builder_prompt', // Optional: version control the AI prompt too
+		'_acf_block_builder_custom_files', // Custom files
 	);
 
 	public function __construct() {
@@ -117,6 +118,36 @@ class ACF_Block_Builder_Revisions {
 					$virtual_content .= "<!-- FILE: $label -->\n";
 					$virtual_content .= "<!-- **************************************** -->\n";
 					$virtual_content .= $val . "\n\n";
+				}
+			}
+
+			// Include custom files
+			$post_id = isset( $postarr['ID'] ) ? $postarr['ID'] : 0;
+			if ( $post_id ) {
+				$custom_files_json = isset( $_POST['acf_block_builder_custom_files'] ) 
+					? wp_unslash( $_POST['acf_block_builder_custom_files'] ) 
+					: get_post_meta( $post_id, '_acf_block_builder_custom_files', true );
+				
+				$custom_files = ! empty( $custom_files_json ) ? json_decode( $custom_files_json, true ) : array();
+				
+				if ( is_array( $custom_files ) ) {
+					foreach ( $custom_files as $file_id => $file_data ) {
+						$filename = isset( $file_data['filename'] ) ? strtoupper( $file_data['filename'] ) : $file_id;
+						$content = isset( $file_data['content'] ) ? trim( $file_data['content'] ) : '';
+						
+						// Check for individual textarea content
+						$textarea_key = 'acf_block_builder_custom_file_' . $file_id;
+						if ( isset( $_POST[ $textarea_key ] ) ) {
+							$content = trim( wp_unslash( $_POST[ $textarea_key ] ) );
+						}
+						
+						if ( ! empty( $content ) ) {
+							$virtual_content .= "<!-- **************************************** -->\n";
+							$virtual_content .= "<!-- FILE: $filename -->\n";
+							$virtual_content .= "<!-- **************************************** -->\n";
+							$virtual_content .= $content . "\n\n";
+						}
+					}
 				}
 			}
 

@@ -293,7 +293,8 @@ class ACF_Block_Builder_AI {
 		- Each file_key may appear AT MOST ONCE per response. (No reopening or second passes in the same response.)
 		- Never output "@@@FILE:" or "@@@END_FILE@@@" anywhere except delimiter lines.
 		
-		VALID file_key values (ONLY THESE):
+		VALID file_key values:
+		Core files (always available):
 		- plan        (required)
 		- block_json
 		- render_php
@@ -302,6 +303,16 @@ class ACF_Block_Builder_AI {
 		- fields_php
 		- assets_php
 		- summary     (required)
+		
+		Custom files (create on demand):
+		- custom_<filename_without_extension> (e.g., custom_functions_php for functions.php)
+		
+		CREATING NEW FILES:
+		If the user asks for a new file or you determine one is needed:
+		1. Use @@@FILE:custom_<safe_filename>@@@ where <safe_filename> is the filename with dots replaced by underscores
+		2. The file will be automatically created and added to the block
+		3. Example: For "helpers.php", use @@@FILE:custom_helpers_php@@@
+		4. Example: For "animations.js", use @@@FILE:custom_animations_js@@@
 		
 		FULL-FILE OUTPUT ONLY (NO MISSING CODE):
 		- When you output a file, output the ENTIRE file contents from first character to last character.

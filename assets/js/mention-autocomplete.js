@@ -76,22 +76,8 @@
     // =========================================
     
     function getAvailableFiles() {
-        if (window.SmartTokens && window.SmartTokens.getRegistry) {
-            var registry = window.SmartTokens.getRegistry();
-            if (registry.files) {
-                return Object.keys(registry.files).map(function(fileName) {
-                    var fileConfig = registry.files[fileName];
-                    return {
-                        id: fileName,
-                        label: fileConfig.label || fileName,
-                        icon: fileConfig.icon || 'media-code',
-                        tabId: fileConfig.tabId
-                    };
-                });
-            }
-        }
-        
-        return [
+        // Core files
+        var files = [
             { id: 'block.json', label: 'block.json', icon: 'media-code', tabId: 'block-json' },
             { id: 'render.php', label: 'render.php', icon: 'editor-code', tabId: 'render-php' },
             { id: 'style.css', label: 'style.css', icon: 'art', tabId: 'style-css' },
@@ -99,6 +85,45 @@
             { id: 'fields.php', label: 'fields.php', icon: 'database', tabId: 'fields-php' },
             { id: 'assets.php', label: 'assets.php', icon: 'admin-links', tabId: 'assets-php' }
         ];
+        
+        // Add custom files from the hidden field
+        var customFilesJson = $('#acf-bb-custom-files').val();
+        if (customFilesJson) {
+            try {
+                var customFiles = JSON.parse(customFilesJson);
+                if (customFiles && typeof customFiles === 'object') {
+                    // Icon mapping for file extensions
+                    var extToIcon = {
+                        'php': 'editor-code',
+                        'js': 'media-default',
+                        'css': 'art',
+                        'json': 'media-code',
+                        'html': 'media-text',
+                        'txt': 'text-page'
+                    };
+                    
+                    Object.keys(customFiles).forEach(function(fileId) {
+                        var fileData = customFiles[fileId];
+                        if (fileData && fileData.filename) {
+                            var ext = fileData.filename.split('.').pop().toLowerCase();
+                            var icon = extToIcon[ext] || 'media-text';
+                            var tabId = 'custom-' + fileId.replace(/_/g, '-');
+                            
+                            files.push({
+                                id: fileData.filename,
+                                label: fileData.filename,
+                                icon: icon,
+                                tabId: tabId
+                            });
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error('Error parsing custom files for mention autocomplete:', e);
+            }
+        }
+        
+        return files;
     }
 
     function getAcfFieldTypes() {
@@ -601,6 +626,7 @@
         }
         
         renderDropdown(items);
+        positionDropdown();
         scrollToSelected();
     }
     
@@ -845,6 +871,140 @@
         
         // Get text content
         return $clone.text().trim();
+    }
+
+    /**
+     * Get the editor content as HTML with chips converted to display format.
+     * This preserves the position of chips within the text.
+     */
+    function getDisplayContent() {
+        var $editor = $(config.editorSelector);
+        if (!$editor.length) {
+            return $(config.textareaSelector).val();
+        }
+        
+        // Clone the editor content
+        var $clone = $editor.clone();
+        
+        // Convert inline chips to display chips (preserving position)
+        $clone.find('.acf-bb-inline-chip').each(function() {
+            var $chip = $(this);
+            var chipType = $chip.data('chip-type');
+            var displayChip = '';
+            
+            if (chipType === 'error') {
+                // Error chip
+                var errorCount = $chip.data('error-count');
+                var errorDetails = $chip.data('error-details');
+                var tooltipLines = [];
+                
+                if (errorDetails) {
+                    var details = typeof errorDetails === 'string' ? JSON.parse(errorDetails) : errorDetails;
+                    details.forEach(function(detail) {
+                        tooltipLines.push('<strong>' + escapeHtml(detail.file) + '</strong>');
+                        detail.errors.forEach(function(err) {
+                            tooltipLines.push('• Line ' + err.line + ': ' + escapeHtml(err.message));
+                        });
+                    });
+                }
+                
+                displayChip = '<span class="acf-bb-token-chip acf-bb-error-token-chip" data-token-type="error" data-tooltip="' + 
+                       tooltipLines.join('\n').replace(/"/g, '&quot;') + '">' +
+                       '<span class="dashicons dashicons-warning"></span>' +
+                       '<span class="acf-bb-token-label">' + errorCount + ' Error' + (errorCount !== 1 ? 's' : '') + '</span></span>';
+            } else {
+                // File or other chip
+                var itemId = $chip.data('item-id');
+                var itemType = $chip.data('item-type') || 'file';
+                var tabId = $chip.data('tab-id') || '';
+                var label = $chip.find('.acf-bb-inline-chip-label').text();
+                var iconClass = $chip.find('.dashicons').first().attr('class').replace('dashicons ', '').replace('dashicons-', '');
+                
+                displayChip = '<span class="acf-bb-token-chip" data-token-type="' + itemType + '"' +
+                       (tabId ? ' data-tab-id="' + tabId + '"' : '') + 
+                       ' data-item-id="' + itemId + '">' +
+                       '<span class="dashicons dashicons-' + iconClass + '"></span>' +
+                       '<span class="acf-bb-token-label">' + label + '</span></span>';
+            }
+            
+            $(this).replaceWith(displayChip);
+        });
+        
+        // Remove the remove buttons that may have been left
+        $clone.find('.acf-bb-inline-chip-remove').remove();
+        
+        // Get the HTML content and clean it up
+        var html = $clone.html() || '';
+        
+        // Normalize whitespace but preserve structure
+        html = html.replace(/&nbsp;/g, ' ').trim();
+        
+        return html;
+    }
+    
+    /**
+     * Get structured content with tokens and their positions for chat history storage.
+     */
+    function getStructuredContent() {
+        var $editor = $(config.editorSelector);
+        if (!$editor.length) {
+            return { text: $(config.textareaSelector).val(), tokens: [], positions: [] };
+        }
+        
+        var result = {
+            segments: [] // Array of { type: 'text'|'token', content: string|tokenObject }
+        };
+        
+        // Iterate through child nodes to preserve order
+        var nodes = $editor[0].childNodes;
+        for (var i = 0; i < nodes.length; i++) {
+            var node = nodes[i];
+            
+            if (node.nodeType === Node.TEXT_NODE) {
+                var text = node.textContent;
+                if (text && text.trim()) {
+                    result.segments.push({
+                        type: 'text',
+                        content: text.replace(/\u00A0/g, ' ').trim()
+                    });
+                }
+            } else if (node.nodeType === Node.ELEMENT_NODE && $(node).hasClass('acf-bb-inline-chip')) {
+                var $chip = $(node);
+                var chipType = $chip.data('chip-type');
+                
+                if (chipType === 'error') {
+                    var errorDetails = $chip.data('error-details');
+                    result.segments.push({
+                        type: 'token',
+                        content: {
+                            type: 'error',
+                            count: $chip.data('error-count'),
+                            details: typeof errorDetails === 'string' ? JSON.parse(errorDetails) : errorDetails
+                        }
+                    });
+                } else {
+                    var itemType = $chip.data('item-type') || 'file';
+                    var itemId = $chip.data('item-id');
+                    var tabId = $chip.data('tab-id');
+                    var label = $chip.find('.acf-bb-inline-chip-label').text();
+                    var iconClass = $chip.find('.dashicons').first().attr('class');
+                    var icon = iconClass ? iconClass.replace('dashicons ', '').replace('dashicons-', '').split(' ')[0] : 'media-code';
+                    
+                    result.segments.push({
+                        type: 'token',
+                        content: {
+                            type: itemType,
+                            id: itemId,
+                            label: label,
+                            icon: icon,
+                            tabId: tabId
+                        }
+                    });
+                }
+            }
+        }
+        
+        return result;
     }
 
     function clearEditor() {
@@ -1664,6 +1824,8 @@
         getAttachedTokens: getAttachedTokens,
         getContextString: getContextString,
         getPlainText: getPlainText,
+        getDisplayContent: getDisplayContent,
+        getStructuredContent: getStructuredContent,
         clearAttached: clearAttached,
         attachToken: attachToken,
         detachToken: detachToken,

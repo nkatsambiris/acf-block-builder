@@ -25,6 +25,48 @@ class ACF_Block_Builder_File_Versions {
 		'assets' => 'assets.php',
 	);
 
+	/**
+	 * Get custom files for a post and return them as file_types format
+	 */
+	private function get_custom_file_types( $post_id ) {
+		$custom_files_json = get_post_meta( $post_id, '_acf_block_builder_custom_files', true );
+		$custom_files = ! empty( $custom_files_json ) ? json_decode( $custom_files_json, true ) : array();
+		
+		$file_types = array();
+		if ( is_array( $custom_files ) ) {
+			foreach ( $custom_files as $file_id => $file_data ) {
+				// Custom file types are prefixed with 'custom_'
+				$file_types[ 'custom_' . $file_id ] = $file_data;
+			}
+		}
+		
+		return $file_types;
+	}
+
+	/**
+	 * Get custom file labels for a post
+	 */
+	private function get_custom_file_labels( $post_id ) {
+		$custom_files_json = get_post_meta( $post_id, '_acf_block_builder_custom_files', true );
+		$custom_files = ! empty( $custom_files_json ) ? json_decode( $custom_files_json, true ) : array();
+		
+		$labels = array();
+		if ( is_array( $custom_files ) ) {
+			foreach ( $custom_files as $file_id => $file_data ) {
+				$labels[ 'custom_' . $file_id ] = isset( $file_data['filename'] ) ? $file_data['filename'] : $file_id;
+			}
+		}
+		
+		return $labels;
+	}
+
+	/**
+	 * Check if a file type is a custom file
+	 */
+	private function is_custom_file_type( $file_type ) {
+		return strpos( $file_type, 'custom_' ) === 0;
+	}
+
 	public function __construct() {
 		global $wpdb;
 		$this->table_name = $wpdb->prefix . 'acf_block_file_versions';
@@ -48,7 +90,7 @@ class ACF_Block_Builder_File_Versions {
 		$sql = "CREATE TABLE $table_name (
 			id bigint(20) NOT NULL AUTO_INCREMENT,
 			post_id bigint(20) NOT NULL,
-			file_type varchar(50) NOT NULL,
+			file_type varchar(100) NOT NULL,
 			content longtext NOT NULL,
 			content_hash varchar(64) NOT NULL,
 			version_number int(11) NOT NULL,
@@ -64,7 +106,7 @@ class ACF_Block_Builder_File_Versions {
 		dbDelta( $sql );
 
 		// Store version for future migrations
-		update_option( 'acf_block_file_versions_db_version', '1.0' );
+		update_option( 'acf_block_file_versions_db_version', '1.1' );
 	}
 
 	/**
@@ -97,8 +139,45 @@ class ACF_Block_Builder_File_Versions {
 		$user_id = get_current_user_id();
 		$changes_made = array();
 
+		// Save core file versions
 		foreach ( $this->file_types as $type => $meta_key ) {
 			$content = get_post_meta( $post_id, $meta_key, true );
+			
+			// Skip empty content
+			if ( empty( $content ) ) {
+				continue;
+			}
+
+			$content_hash = md5( $content );
+
+			// Get latest version for this file
+			$last_version = $this->get_latest_version( $post_id, $type );
+
+			// Only save if content actually changed
+			if ( ! $last_version || $last_version->content_hash !== $content_hash ) {
+				$version_number = $last_version ? $last_version->version_number + 1 : 1;
+
+				$wpdb->insert(
+					$this->table_name,
+					array(
+						'post_id'        => $post_id,
+						'file_type'      => $type,
+						'content'        => $content,
+						'content_hash'   => $content_hash,
+						'version_number' => $version_number,
+						'user_id'        => $user_id,
+					),
+					array( '%d', '%s', '%s', '%s', '%d', '%d' )
+				);
+
+				$changes_made[] = $type;
+			}
+		}
+
+		// Save custom file versions
+		$custom_files = $this->get_custom_file_types( $post_id );
+		foreach ( $custom_files as $type => $file_data ) {
+			$content = isset( $file_data['content'] ) ? $file_data['content'] : '';
 			
 			// Skip empty content
 			if ( empty( $content ) ) {
@@ -185,12 +264,26 @@ class ACF_Block_Builder_File_Versions {
 	public function get_all_file_versions( $post_id, $limit_per_file = 20 ) {
 		$all_versions = array();
 
+		// Get core file versions
 		foreach ( $this->file_types as $type => $meta_key ) {
 			$versions = $this->get_file_versions( $post_id, $type, $limit_per_file );
 			if ( ! empty( $versions ) ) {
 				$all_versions[ $type ] = array(
 					'label'    => $this->file_labels[ $type ],
 					'versions' => $versions,
+				);
+			}
+		}
+
+		// Get custom file versions
+		$custom_labels = $this->get_custom_file_labels( $post_id );
+		foreach ( $custom_labels as $type => $label ) {
+			$versions = $this->get_file_versions( $post_id, $type, $limit_per_file );
+			if ( ! empty( $versions ) ) {
+				$all_versions[ $type ] = array(
+					'label'    => $label,
+					'versions' => $versions,
+					'is_custom' => true,
 				);
 			}
 		}
@@ -225,13 +318,44 @@ class ACF_Block_Builder_File_Versions {
 			return false;
 		}
 
-		$meta_key = $this->file_types[ $version->file_type ] ?? null;
-		if ( ! $meta_key ) {
-			return false;
-		}
+		$file_type = $version->file_type;
+		$is_custom = $this->is_custom_file_type( $file_type );
 
-		// Update the post meta
-		update_post_meta( $post_id, $meta_key, $version->content );
+		if ( $is_custom ) {
+			// Handle custom file restoration
+			$custom_files_json = get_post_meta( $post_id, '_acf_block_builder_custom_files', true );
+			$custom_files = ! empty( $custom_files_json ) ? json_decode( $custom_files_json, true ) : array();
+			
+			if ( ! is_array( $custom_files ) ) {
+				$custom_files = array();
+			}
+
+			// Extract the original file_id from the type (remove 'custom_' prefix)
+			$file_id = substr( $file_type, 7 ); // Remove 'custom_' prefix
+			
+			if ( ! isset( $custom_files[ $file_id ] ) ) {
+				return false;
+			}
+
+			// Update the content
+			$custom_files[ $file_id ]['content'] = $version->content;
+			
+			// Save back to post meta
+			update_post_meta( $post_id, '_acf_block_builder_custom_files', wp_slash( wp_json_encode( $custom_files ) ) );
+			
+			$label = $custom_files[ $file_id ]['filename'];
+		} else {
+			// Handle core file restoration
+			$meta_key = $this->file_types[ $file_type ] ?? null;
+			if ( ! $meta_key ) {
+				return false;
+			}
+
+			// Update the post meta
+			update_post_meta( $post_id, $meta_key, $version->content );
+			
+			$label = $this->file_labels[ $file_type ];
+		}
 
 		// Save this restoration as a new version
 		$this->save_file_versions( $post_id );
@@ -245,9 +369,10 @@ class ACF_Block_Builder_File_Versions {
 		}
 
 		return array(
-			'file_type' => $version->file_type,
+			'file_type' => $file_type,
 			'content'   => $version->content,
-			'label'     => $this->file_labels[ $version->file_type ],
+			'label'     => $label,
+			'is_custom' => $is_custom,
 		);
 	}
 
@@ -258,32 +383,48 @@ class ACF_Block_Builder_File_Versions {
 	public function prune_old_versions( $post_id, $keep = 30 ) {
 		global $wpdb;
 
+		// Prune core file versions
 		foreach ( array_keys( $this->file_types ) as $type ) {
-			// Get IDs to keep
-			$keep_ids = $wpdb->get_col(
+			$this->prune_file_type_versions( $post_id, $type, $keep );
+		}
+
+		// Prune custom file versions
+		$custom_labels = $this->get_custom_file_labels( $post_id );
+		foreach ( array_keys( $custom_labels ) as $type ) {
+			$this->prune_file_type_versions( $post_id, $type, $keep );
+		}
+	}
+
+	/**
+	 * Prune versions for a specific file type
+	 */
+	private function prune_file_type_versions( $post_id, $type, $keep ) {
+		global $wpdb;
+
+		// Get IDs to keep
+		$keep_ids = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT id FROM {$this->table_name}
+				WHERE post_id = %d AND file_type = %s
+				ORDER BY version_number DESC
+				LIMIT %d",
+				$post_id,
+				$type,
+				$keep
+			)
+		);
+
+		if ( ! empty( $keep_ids ) ) {
+			$keep_ids_str = implode( ',', array_map( 'intval', $keep_ids ) );
+			
+			$wpdb->query(
 				$wpdb->prepare(
-					"SELECT id FROM {$this->table_name}
-					WHERE post_id = %d AND file_type = %s
-					ORDER BY version_number DESC
-					LIMIT %d",
+					"DELETE FROM {$this->table_name}
+					WHERE post_id = %d AND file_type = %s AND id NOT IN ($keep_ids_str)",
 					$post_id,
-					$type,
-					$keep
+					$type
 				)
 			);
-
-			if ( ! empty( $keep_ids ) ) {
-				$keep_ids_str = implode( ',', array_map( 'intval', $keep_ids ) );
-				
-				$wpdb->query(
-					$wpdb->prepare(
-						"DELETE FROM {$this->table_name}
-						WHERE post_id = %d AND file_type = %s AND id NOT IN ($keep_ids_str)",
-						$post_id,
-						$type
-					)
-				);
-			}
 		}
 	}
 
@@ -318,11 +459,24 @@ class ACF_Block_Builder_File_Versions {
 		);
 
 		$counts = array();
+		
+		// Core file counts
 		foreach ( $this->file_types as $type => $meta_key ) {
 			$counts[ $type ] = array(
 				'count'          => isset( $results[ $type ] ) ? (int) $results[ $type ]->count : 0,
 				'latest_version' => isset( $results[ $type ] ) ? (int) $results[ $type ]->latest_version : 0,
 				'label'          => $this->file_labels[ $type ],
+			);
+		}
+
+		// Custom file counts
+		$custom_labels = $this->get_custom_file_labels( $post_id );
+		foreach ( $custom_labels as $type => $label ) {
+			$counts[ $type ] = array(
+				'count'          => isset( $results[ $type ] ) ? (int) $results[ $type ]->count : 0,
+				'latest_version' => isset( $results[ $type ] ) ? (int) $results[ $type ]->latest_version : 0,
+				'label'          => $label,
+				'is_custom'      => true,
 			);
 		}
 
@@ -344,14 +498,25 @@ class ACF_Block_Builder_File_Versions {
 		}
 
 		$post_id   = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
-		$file_type = isset( $_POST['file_type'] ) ? sanitize_key( $_POST['file_type'] ) : '';
+		$file_type = isset( $_POST['file_type'] ) ? sanitize_text_field( $_POST['file_type'] ) : '';
 
 		if ( ! $post_id || ! $file_type ) {
 			wp_send_json_error( 'Missing parameters.' );
 		}
 
-		if ( ! array_key_exists( $file_type, $this->file_types ) ) {
+		// Check if it's a core file type or custom file type
+		$is_custom = $this->is_custom_file_type( $file_type );
+		
+		if ( ! $is_custom && ! array_key_exists( $file_type, $this->file_types ) ) {
 			wp_send_json_error( 'Invalid file type.' );
+		}
+
+		// Get label
+		if ( $is_custom ) {
+			$custom_labels = $this->get_custom_file_labels( $post_id );
+			$label = isset( $custom_labels[ $file_type ] ) ? $custom_labels[ $file_type ] : $file_type;
+		} else {
+			$label = $this->file_labels[ $file_type ];
 		}
 
 		$versions = $this->get_file_versions( $post_id, $file_type );
@@ -359,7 +524,8 @@ class ACF_Block_Builder_File_Versions {
 		wp_send_json_success( array(
 			'versions'  => $versions,
 			'file_type' => $file_type,
-			'label'     => $this->file_labels[ $file_type ],
+			'label'     => $label,
+			'is_custom' => $is_custom,
 		) );
 	}
 
@@ -410,9 +576,20 @@ class ACF_Block_Builder_File_Versions {
 			wp_send_json_error( 'Version not found.' );
 		}
 
+		$file_type = $version->file_type;
+		$is_custom = $this->is_custom_file_type( $file_type );
+		
+		if ( $is_custom ) {
+			$custom_labels = $this->get_custom_file_labels( $version->post_id );
+			$label = isset( $custom_labels[ $file_type ] ) ? $custom_labels[ $file_type ] : $file_type;
+		} else {
+			$label = isset( $this->file_labels[ $file_type ] ) ? $this->file_labels[ $file_type ] : $file_type;
+		}
+
 		wp_send_json_success( array(
-			'version' => $version,
-			'label'   => $this->file_labels[ $version->file_type ],
+			'version'   => $version,
+			'label'     => $label,
+			'is_custom' => $is_custom,
 		) );
 	}
 
@@ -445,10 +622,21 @@ class ACF_Block_Builder_File_Versions {
 			wp_send_json_error( 'Cannot compare different file types.' );
 		}
 
+		$file_type = $original->file_type;
+		$is_custom = $this->is_custom_file_type( $file_type );
+		
+		if ( $is_custom ) {
+			$custom_labels = $this->get_custom_file_labels( $original->post_id );
+			$label = isset( $custom_labels[ $file_type ] ) ? $custom_labels[ $file_type ] : $file_type;
+		} else {
+			$label = isset( $this->file_labels[ $file_type ] ) ? $this->file_labels[ $file_type ] : $file_type;
+		}
+
 		wp_send_json_success( array(
-			'original' => $original,
-			'modified' => $modified,
-			'label'    => $this->file_labels[ $original->file_type ],
+			'original'  => $original,
+			'modified'  => $modified,
+			'label'     => $label,
+			'is_custom' => $is_custom,
 		) );
 	}
 
@@ -505,7 +693,16 @@ new ACF_Block_Builder_File_Versions();
  * This handles upgrades where the activation hook wouldn't fire
  */
 add_action( 'admin_init', function() {
-	// Only check once per day to avoid overhead
+	$current_version = get_option( 'acf_block_file_versions_db_version', '0' );
+	$target_version = '1.1';
+	
+	// Run migration if version changed
+	if ( version_compare( $current_version, $target_version, '<' ) ) {
+		ACF_Block_Builder_File_Versions::create_table();
+		return;
+	}
+	
+	// Only check table existence once per day to avoid overhead
 	$last_check = get_option( 'acf_block_file_versions_table_check', 0 );
 	$one_day = 86400;
 	

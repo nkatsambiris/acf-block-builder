@@ -594,6 +594,7 @@
     background: #fff;
     padding: 0;
     margin: 0;
+    overflow-y: scroll;
 }
 
 .acf-bb-tab {
@@ -1672,6 +1673,81 @@
 
 .acf-bb-plan-item {
     padding-left: 8px;
+}
+
+/* ==========================================
+   CUSTOM FILES MANAGEMENT
+   ========================================== */
+
+/* Add File Button */
+.acf-bb-add-file-btn {
+    padding: 8px 12px;
+    background: transparent;
+    border: 1px dashed #c3c4c7;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #8c8f94;
+    font-size: 13px;
+    transition: all 0.2s ease;
+    margin-left: 4px;
+}
+
+.acf-bb-add-file-btn:hover {
+    background: #f0f9ff;
+    border-color: #2271b1;
+    border-style: solid;
+    color: #2271b1;
+}
+
+.acf-bb-add-file-btn .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+/* Custom Tab Styles */
+.acf-bb-custom-tab {
+    position: relative;
+    padding-right: 32px !important;
+}
+
+.acf-bb-custom-tab:hover .acf-bb-delete-file {
+    opacity: 1;
+}
+
+/* Delete File Button */
+.acf-bb-delete-file {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.15s ease;
+    color: #8c8f94;
+}
+
+.acf-bb-delete-file:hover {
+    background: #fecaca;
+    color: #dc2626;
+}
+
+.acf-bb-delete-file .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
 }
 
 /* ==========================================

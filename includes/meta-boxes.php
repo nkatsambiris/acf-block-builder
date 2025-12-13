@@ -18,6 +18,10 @@ class ACF_Block_Builder_Meta_Boxes {
 		add_action( 'manage_acf_block_builder_posts_custom_column', array( $this, 'render_active_column' ), 10, 2 );
 		add_action( 'wp_ajax_acf_block_builder_toggle_active', array( $this, 'handle_toggle_active' ) );
 		add_action( 'wp_ajax_acf_block_builder_sync_back', array( $this, 'handle_sync_back' ) );
+		
+		// Custom Files AJAX handlers
+		add_action( 'wp_ajax_acf_block_builder_add_custom_file', array( $this, 'handle_add_custom_file' ) );
+		add_action( 'wp_ajax_acf_block_builder_delete_custom_file', array( $this, 'handle_delete_custom_file' ) );
 	}
 
 	public function handle_sync_back() {
@@ -71,6 +75,152 @@ class ACF_Block_Builder_Meta_Boxes {
 		$this->generate_block_files( $post_id );
 
 		wp_send_json_success( 'Fields imported successfully. Reloading...' );
+	}
+
+	/**
+	 * AJAX handler to add a custom file immediately.
+	 */
+	public function handle_add_custom_file() {
+		check_ajax_referer( 'acf_block_builder_export', 'nonce' );
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( 'Permission denied.' );
+		}
+
+		$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+		$filename = isset( $_POST['filename'] ) ? sanitize_file_name( $_POST['filename'] ) : '';
+		$content = isset( $_POST['content'] ) ? wp_unslash( $_POST['content'] ) : '';
+
+		if ( ! $post_id ) {
+			wp_send_json_error( 'Invalid Post ID.' );
+		}
+
+		if ( empty( $filename ) ) {
+			wp_send_json_error( 'Filename is required.' );
+		}
+
+		// Validate filename format
+		if ( ! preg_match( '/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/', $filename ) ) {
+			wp_send_json_error( 'Invalid filename format.' );
+		}
+
+		// Check for reserved filenames
+		$reserved = array( 'block.json', 'render.php', 'style.css', 'script.js', 'fields.php', 'assets.php' );
+		if ( in_array( strtolower( $filename ), $reserved, true ) ) {
+			wp_send_json_error( 'This filename is reserved.' );
+		}
+
+		$block_slug = get_post_field( 'post_name', $post_id );
+		if ( empty( $block_slug ) ) {
+			wp_send_json_error( 'Block slug not found. Please save the post first.' );
+		}
+
+		// Get existing custom files
+		$custom_files_json = get_post_meta( $post_id, '_acf_block_builder_custom_files', true );
+		$custom_files = ! empty( $custom_files_json ) ? json_decode( $custom_files_json, true ) : array();
+		if ( ! is_array( $custom_files ) ) {
+			$custom_files = array();
+		}
+
+		// Create file ID
+		$file_id = str_replace( '.', '_', $filename );
+
+		// Check for duplicates
+		if ( isset( $custom_files[ $file_id ] ) ) {
+			wp_send_json_error( 'A file with this name already exists.' );
+		}
+
+		// Add to custom files
+		$custom_files[ $file_id ] = array(
+			'filename' => $filename,
+			'content'  => $content,
+		);
+
+		// Save to post meta
+		// Use wp_slash() to preserve JSON escape sequences (like \r\n) since update_post_meta() calls wp_unslash()
+		update_post_meta( $post_id, '_acf_block_builder_custom_files', wp_slash( wp_json_encode( $custom_files ) ) );
+
+		// Write file to disk
+		$upload_dir = wp_upload_dir();
+		$block_dir  = $upload_dir['basedir'] . '/acf-blocks/' . $block_slug;
+
+		if ( ! file_exists( $block_dir ) ) {
+			wp_mkdir_p( $block_dir );
+		}
+
+		file_put_contents( $block_dir . '/' . $filename, $content );
+
+		// Save initial version for the new custom file
+		if ( class_exists( 'ACF_Block_Builder_File_Versions' ) ) {
+			$versions_handler = new ACF_Block_Builder_File_Versions();
+			$versions_handler->save_file_versions( $post_id );
+		}
+
+		wp_send_json_success( array(
+			'file_id'  => $file_id,
+			'filename' => $filename,
+			'message'  => 'File created successfully.',
+		) );
+	}
+
+	/**
+	 * AJAX handler to delete a custom file immediately.
+	 */
+	public function handle_delete_custom_file() {
+		check_ajax_referer( 'acf_block_builder_export', 'nonce' );
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( 'Permission denied.' );
+		}
+
+		$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+		$file_id = isset( $_POST['file_id'] ) ? sanitize_text_field( $_POST['file_id'] ) : '';
+
+		if ( ! $post_id ) {
+			wp_send_json_error( 'Invalid Post ID.' );
+		}
+
+		if ( empty( $file_id ) ) {
+			wp_send_json_error( 'File ID is required.' );
+		}
+
+		// Get existing custom files
+		$custom_files_json = get_post_meta( $post_id, '_acf_block_builder_custom_files', true );
+		$custom_files = ! empty( $custom_files_json ) ? json_decode( $custom_files_json, true ) : array();
+		if ( ! is_array( $custom_files ) ) {
+			$custom_files = array();
+		}
+
+		// Check if file exists
+		if ( ! isset( $custom_files[ $file_id ] ) ) {
+			wp_send_json_error( 'File not found.' );
+		}
+
+		$filename = $custom_files[ $file_id ]['filename'];
+
+		// Remove from custom files
+		unset( $custom_files[ $file_id ] );
+
+		// Save to post meta
+		// Use wp_slash() to preserve JSON escape sequences since update_post_meta() calls wp_unslash()
+		update_post_meta( $post_id, '_acf_block_builder_custom_files', wp_slash( wp_json_encode( $custom_files ) ) );
+
+		// Delete file from disk
+		$block_slug = get_post_field( 'post_name', $post_id );
+		if ( ! empty( $block_slug ) ) {
+			$upload_dir = wp_upload_dir();
+			$block_dir  = $upload_dir['basedir'] . '/acf-blocks/' . $block_slug;
+			$file_path  = $block_dir . '/' . $filename;
+
+			if ( file_exists( $file_path ) ) {
+				unlink( $file_path );
+			}
+		}
+
+		wp_send_json_success( array(
+			'file_id' => $file_id,
+			'message' => 'File deleted successfully.',
+		) );
 	}
 
 	public function add_active_column( $columns ) {
@@ -483,34 +633,71 @@ class ACF_Block_Builder_Meta_Boxes {
 		$fields_php = get_post_meta( $post->ID, '_acf_block_builder_fields', true );
 		$assets_php = get_post_meta( $post->ID, '_acf_block_builder_assets', true );
 		
+		// Get custom files
+		$custom_files_json = get_post_meta( $post->ID, '_acf_block_builder_custom_files', true );
+		$custom_files = ! empty( $custom_files_json ) ? json_decode( $custom_files_json, true ) : array();
+		if ( ! is_array( $custom_files ) ) {
+			$custom_files = array();
+		}
+		
+		// File type icons mapping
+		$file_icons = array(
+			'php'  => 'dashicons-editor-code',
+			'js'   => 'dashicons-media-default',
+			'css'  => 'dashicons-art',
+			'json' => 'dashicons-media-code',
+			'html' => 'dashicons-media-text',
+			'txt'  => 'dashicons-text-page',
+		);
+		
 		?>
 		<div class="acf-block-builder-container">
 			<div class="code-editors-section">
 				<div class="acf-bb-tabs">
-					<a href="#" class="acf-bb-tab active" data-tab="block-json" data-file-type="json">
+					<a href="#" class="acf-bb-tab active" data-tab="block-json" data-file-type="json" data-core-file="true">
 						<span class="dashicons dashicons-media-code"></span> block.json
 						<span class="acf-bb-lint-badge" data-lint-tab="block-json"></span>
 					</a>
-					<a href="#" class="acf-bb-tab" data-tab="render-php" data-file-type="php">
+					<a href="#" class="acf-bb-tab" data-tab="render-php" data-file-type="php" data-core-file="true">
 						<span class="dashicons dashicons-editor-code"></span> render.php
 						<span class="acf-bb-lint-badge" data-lint-tab="render-php"></span>
 					</a>
-					<a href="#" class="acf-bb-tab" data-tab="style-css" data-file-type="css">
+					<a href="#" class="acf-bb-tab" data-tab="style-css" data-file-type="css" data-core-file="true">
 						<span class="dashicons dashicons-art"></span> style.css
 						<span class="acf-bb-lint-badge" data-lint-tab="style-css"></span>
 					</a>
-					<a href="#" class="acf-bb-tab" data-tab="script-js" data-file-type="js">
+					<a href="#" class="acf-bb-tab" data-tab="script-js" data-file-type="js" data-core-file="true">
 						<span class="dashicons dashicons-media-default"></span> script.js
 						<span class="acf-bb-lint-badge" data-lint-tab="script-js"></span>
 					</a>
-					<a href="#" class="acf-bb-tab" data-tab="fields-php" data-file-type="fields">
+					<a href="#" class="acf-bb-tab" data-tab="fields-php" data-file-type="fields" data-core-file="true">
 						<span class="dashicons dashicons-database"></span> fields.php
 						<span class="acf-bb-lint-badge" data-lint-tab="fields-php"></span>
 					</a>
-					<a href="#" class="acf-bb-tab" data-tab="assets-php" data-file-type="assets">
+					<a href="#" class="acf-bb-tab" data-tab="assets-php" data-file-type="assets" data-core-file="true">
 						<span class="dashicons dashicons-admin-links"></span> assets.php
 						<span class="acf-bb-lint-badge" data-lint-tab="assets-php"></span>
 					</a>
+					<?php
+				// Render custom file tabs
+				foreach ( $custom_files as $file_id => $file_data ) :
+					$filename = isset( $file_data['filename'] ) ? $file_data['filename'] : $file_id;
+					$ext = pathinfo( $filename, PATHINFO_EXTENSION );
+					$icon = isset( $file_icons[ $ext ] ) ? $file_icons[ $ext ] : 'dashicons-media-text';
+					// Use same logic as JavaScript: replace underscores with dashes
+					$tab_id = 'custom-' . str_replace( '_', '-', $file_id );
+				?>
+					<a href="#" class="acf-bb-tab acf-bb-custom-tab" data-tab="<?php echo esc_attr( $tab_id ); ?>" data-file-type="<?php echo esc_attr( $ext ); ?>" data-custom-file="true" data-file-id="<?php echo esc_attr( $file_id ); ?>">
+						<span class="dashicons <?php echo esc_attr( $icon ); ?>"></span> <?php echo esc_html( $filename ); ?>
+						<button type="button" class="acf-bb-delete-file" data-file-id="<?php echo esc_attr( $file_id ); ?>" title="<?php esc_attr_e( 'Delete file', 'acf-block-builder' ); ?>">
+							<span class="dashicons dashicons-no-alt"></span>
+						</button>
+						<span class="acf-bb-lint-badge" data-lint-tab="<?php echo esc_attr( $tab_id ); ?>"></span>
+					</a>
+					<?php endforeach; ?>
+					<button type="button" class="acf-bb-add-file-btn" id="acf-bb-add-file" title="<?php esc_attr_e( 'Add new file', 'acf-block-builder' ); ?>">
+						<span class="dashicons dashicons-plus-alt2"></span>
+					</button>
 					<button type="button" class="acf-bb-history-btn" id="acf-bb-open-history" title="<?php esc_attr_e( 'View Version History', 'acf-block-builder' ); ?>">
 						<span class="dashicons dashicons-backup"></span>
 					</button>
@@ -546,7 +733,23 @@ class ACF_Block_Builder_Meta_Boxes {
 						<div id="editor-assets-php" class="monaco-editor-container"></div>
 						<textarea name="acf_block_builder_assets" id="textarea-assets-php" class="hidden-textarea"><?php echo esc_textarea( $assets_php ); ?></textarea>
 					</div>
+					
+					<?php
+					// Render custom file tab contents
+					foreach ( $custom_files as $file_id => $file_data ) :
+						// Use same logic as JavaScript: replace underscores with dashes
+						$tab_id = 'custom-' . str_replace( '_', '-', $file_id );
+						$content = isset( $file_data['content'] ) ? $file_data['content'] : '';
+					?>
+					<div class="acf-bb-tab-content" id="tab-<?php echo esc_attr( $tab_id ); ?>">
+						<div id="editor-<?php echo esc_attr( $tab_id ); ?>" class="monaco-editor-container"></div>
+						<textarea name="acf_block_builder_custom_file_<?php echo esc_attr( $file_id ); ?>" id="textarea-<?php echo esc_attr( $tab_id ); ?>" class="hidden-textarea"><?php echo esc_textarea( $content ); ?></textarea>
+					</div>
+					<?php endforeach; ?>
 				</div>
+				
+				<!-- Hidden field to store custom files data -->
+				<input type="hidden" name="acf_block_builder_custom_files" id="acf-bb-custom-files" value="<?php echo esc_attr( $custom_files_json ); ?>" />
 				
 				<!-- Problems Panel -->
 				<div class="acf-bb-problems-panel" id="acf-bb-problems-panel">
@@ -714,6 +917,26 @@ class ACF_Block_Builder_Meta_Boxes {
 		if ( isset( $_POST['acf_block_builder_ignored_errors'] ) ) {
 			update_post_meta( $post_id, '_acf_block_builder_ignored_errors', sanitize_textarea_field( $_POST['acf_block_builder_ignored_errors'] ) );
 		}
+		
+		// Save custom files
+		if ( isset( $_POST['acf_block_builder_custom_files'] ) ) {
+			$custom_files_json = wp_unslash( $_POST['acf_block_builder_custom_files'] );
+			$custom_files = json_decode( $custom_files_json, true );
+			
+			if ( is_array( $custom_files ) ) {
+				// Update content from individual textareas
+				foreach ( $custom_files as $file_id => &$file_data ) {
+					$textarea_key = 'acf_block_builder_custom_file_' . $file_id;
+					if ( isset( $_POST[ $textarea_key ] ) ) {
+						$file_data['content'] = wp_unslash( $_POST[ $textarea_key ] );
+					}
+				}
+				// Use wp_slash() to preserve JSON escape sequences (like \r\n) since update_post_meta() calls wp_unslash()
+				update_post_meta( $post_id, '_acf_block_builder_custom_files', wp_slash( wp_json_encode( $custom_files ) ) );
+			} else {
+				update_post_meta( $post_id, '_acf_block_builder_custom_files', '' );
+			}
+		}
 
 		// Trigger file generation
 		$this->generate_block_files( $post_id );
@@ -815,6 +1038,24 @@ class ACF_Block_Builder_Meta_Boxes {
 		$assets_content = get_post_meta( $post_id, '_acf_block_builder_assets', true );
 		if ( $assets_content ) {
 			file_put_contents( $block_dir . '/assets.php', stripslashes( $assets_content ) );
+		}
+		
+		// Write custom files
+		$custom_files_json = get_post_meta( $post_id, '_acf_block_builder_custom_files', true );
+		if ( ! empty( $custom_files_json ) ) {
+			$custom_files = json_decode( $custom_files_json, true );
+			if ( is_array( $custom_files ) ) {
+				foreach ( $custom_files as $file_id => $file_data ) {
+					if ( isset( $file_data['filename'] ) && isset( $file_data['content'] ) ) {
+						$filename = sanitize_file_name( $file_data['filename'] );
+						// Content is already properly decoded from JSON, no need for stripslashes
+						$content = $file_data['content'];
+						if ( ! empty( $filename ) ) {
+							file_put_contents( $block_dir . '/' . $filename, $content );
+						}
+					}
+				}
+			}
 		}
 	}
 

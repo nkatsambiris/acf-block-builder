@@ -555,7 +555,7 @@ jQuery(document).ready(function($) {
     // Run enhancement
     initEnhancedHeader();
 
-    function appendMessage(type, content, imageUrl, skipSave, provider, attachedTokens) {
+    function appendMessage(type, content, imageUrl, skipSave, provider, attachedTokens, structuredContent) {
         var icon = type === 'ai' ? 'superhero' : 'admin-users';
         var html = '<div class="acf-bb-message ' + type + '-message">';
         
@@ -584,7 +584,8 @@ jQuery(document).ready(function($) {
                 text: plainText, 
                 image_url: imageUrl || null,
                 provider: provider || null,
-                attachedTokens: attachedTokens || null  // Save attached tokens for restoration
+                attachedTokens: attachedTokens || null,  // Save attached tokens for restoration
+                structuredContent: structuredContent || null  // Save structured content with positions
             });
             saveChatHistory();
         }
@@ -617,57 +618,145 @@ jQuery(document).ready(function($) {
             'assets_php': 'php'
         };
         
+        // Extension to language mapping for custom files
+        var extToLang = {
+            'php': 'php',
+            'js': 'javascript',
+            'css': 'css',
+            'json': 'json',
+            'html': 'html',
+            'txt': 'plaintext'
+        };
+        
+        // Dynamically add custom file entries from chat history
+        chatHistory.forEach(function(msg) {
+            if (msg.code && typeof msg.code === 'object') {
+                Object.keys(msg.code).forEach(function(key) {
+                    if (key.startsWith('custom_') && !fileNames[key]) {
+                        // Parse custom file key (e.g., custom_readme_txt -> readme.txt)
+                        var keyParts = key.replace('custom_', '').split('_');
+                        var ext = keyParts.pop();
+                        var baseName = keyParts.join('_').replace(/_/g, '-');
+                        var filename = baseName + '.' + ext;
+                        var tabId = 'custom-' + baseName + '-' + ext;
+                        
+                        fileNames[key] = filename;
+                        langMap[key] = extToLang[ext] || 'plaintext';
+                        
+                        // Register with SmartTokens for clickable chips in chat
+                        if (window.SmartTokens && window.SmartTokens.registerCustomFile) {
+                            window.SmartTokens.registerCustomFile(filename, tabId);
+                        }
+                    }
+                });
+            }
+        });
+        
         chatHistory.forEach(function(msg, msgIndex) {
             var icon = msg.type === 'ai' ? 'superhero' : 'admin-users';
-            var displayContent = msg.text || msg.content || '';
+            var displayContent = '';
             
-            // If it's old HTML content, strip tags for clean display
-            if (displayContent.indexOf('<') !== -1) {
-                displayContent = displayContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-            }
-            
-            // Escape HTML entities for safe display
-            displayContent = $('<div>').text(displayContent).html();
-            
-            // Reconstruct attached tokens (error chips, file chips) if saved
-            var tokenChipsHtml = '';
-            if (msg.attachedTokens && msg.attachedTokens.length > 0) {
-                tokenChipsHtml = msg.attachedTokens.map(function(token) {
-                    if (token.type === 'error') {
-                        // Build tooltip content for error chip
-                        var tooltipLines = [];
-                        if (token.details) {
-                            token.details.forEach(function(detail) {
-                                tooltipLines.push('<strong>' + $('<div>').text(detail.file).html() + '</strong>');
-                                detail.errors.forEach(function(err) {
-                                    tooltipLines.push('• Line ' + err.line + ': ' + $('<div>').text(err.message).html());
+            // Check if we have structured content with positions preserved
+            if (msg.structuredContent && msg.structuredContent.segments && msg.structuredContent.segments.length > 0) {
+                // Build content from segments, preserving chip positions
+                displayContent = msg.structuredContent.segments.map(function(segment) {
+                    if (segment.type === 'text') {
+                        return $('<div>').text(segment.content).html();
+                    } else if (segment.type === 'token') {
+                        var token = segment.content;
+                        if (token.type === 'error') {
+                            var tooltipLines = [];
+                            if (token.details) {
+                                token.details.forEach(function(detail) {
+                                    tooltipLines.push('<strong>' + $('<div>').text(detail.file).html() + '</strong>');
+                                    detail.errors.forEach(function(err) {
+                                        tooltipLines.push('• Line ' + err.line + ': ' + $('<div>').text(err.message).html());
+                                    });
                                 });
-                            });
+                            }
+                            return '<span class="acf-bb-token-chip acf-bb-error-token-chip" data-token-type="error" data-tooltip="' + 
+                                   tooltipLines.join('\n').replace(/"/g, '&quot;') + '">' +
+                                   '<span class="dashicons dashicons-warning"></span>' +
+                                   '<span class="acf-bb-token-label">' + token.count + ' Error' + (token.count !== 1 ? 's' : '') + '</span></span>';
+                        } else {
+                            // File or other token type
+                            return '<span class="acf-bb-token-chip" data-token-type="' + (token.type || 'file') + '"' +
+                                   (token.tabId ? ' data-tab-id="' + token.tabId + '"' : '') +
+                                   (token.id ? ' data-item-id="' + token.id + '"' : '') + '>' +
+                                   '<span class="dashicons dashicons-' + (token.icon || 'media-code') + '"></span>' +
+                                   '<span class="acf-bb-token-label">' + $('<div>').text(token.label).html() + '</span></span>';
                         }
-                        return '<span class="acf-bb-token-chip acf-bb-error-token-chip" data-token-type="error" data-tooltip="' + 
-                               tooltipLines.join('\n').replace(/"/g, '&quot;') + '">' +
-                               '<span class="dashicons dashicons-warning"></span>' +
-                               '<span class="acf-bb-token-label">' + token.count + ' Error' + (token.count !== 1 ? 's' : '') + '</span></span>';
-                    } else if (token.type === 'file') {
-                        return '<span class="acf-bb-token-chip" data-token-type="file" data-tab-id="' + token.tabId + '">' +
-                               '<span class="dashicons dashicons-' + token.icon + '"></span>' +
-                               '<span class="acf-bb-token-label">' + token.label + '</span></span>';
                     }
                     return '';
                 }).join(' ');
+            } else {
+                // Fallback to old format (for backwards compatibility)
+                displayContent = msg.text || msg.content || '';
                 
-                if (tokenChipsHtml) {
-                    tokenChipsHtml += ' ';
+                // Regenerate "Updated:" text from code keys for consistent formatting
+                if (msg.code && typeof msg.code === 'object' && displayContent.indexOf('Updated:') === 0) {
+                    var updatedFiles = Object.keys(msg.code).map(function(k) {
+                        if (k.startsWith('custom_')) {
+                            var keyParts = k.replace('custom_', '').split('_');
+                            var ext = keyParts.pop();
+                            var baseName = keyParts.join('_').replace(/_/g, '-');
+                            return baseName + '.' + ext;
+                        }
+                        return k.replace('_', '.');
+                    });
+                    if (updatedFiles.length > 0) {
+                        displayContent = 'Updated: ' + updatedFiles.join(', ');
+                    }
                 }
+                
+                // If it's old HTML content, strip tags for clean display
+                if (displayContent.indexOf('<') !== -1) {
+                    displayContent = displayContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                }
+                
+                // Escape HTML entities for safe display
+                displayContent = $('<div>').text(displayContent).html();
+                
+                // Reconstruct attached tokens (error chips, file chips) if saved (legacy: prepend)
+                var tokenChipsHtml = '';
+                if (msg.attachedTokens && msg.attachedTokens.length > 0) {
+                    tokenChipsHtml = msg.attachedTokens.map(function(token) {
+                        if (token.type === 'error') {
+                            // Build tooltip content for error chip
+                            var tooltipLines = [];
+                            if (token.details) {
+                                token.details.forEach(function(detail) {
+                                    tooltipLines.push('<strong>' + $('<div>').text(detail.file).html() + '</strong>');
+                                    detail.errors.forEach(function(err) {
+                                        tooltipLines.push('• Line ' + err.line + ': ' + $('<div>').text(err.message).html());
+                                    });
+                                });
+                            }
+                            return '<span class="acf-bb-token-chip acf-bb-error-token-chip" data-token-type="error" data-tooltip="' + 
+                                   tooltipLines.join('\n').replace(/"/g, '&quot;') + '">' +
+                                   '<span class="dashicons dashicons-warning"></span>' +
+                                   '<span class="acf-bb-token-label">' + token.count + ' Error' + (token.count !== 1 ? 's' : '') + '</span></span>';
+                        } else if (token.type === 'file') {
+                            return '<span class="acf-bb-token-chip" data-token-type="file" data-tab-id="' + token.tabId + '">' +
+                                   '<span class="dashicons dashicons-' + token.icon + '"></span>' +
+                                   '<span class="acf-bb-token-label">' + token.label + '</span></span>';
+                        }
+                        return '';
+                    }).join(' ');
+                    
+                    if (tokenChipsHtml) {
+                        tokenChipsHtml += ' ';
+                    }
+                }
+                
+                // Prepend token chips to display content (legacy behavior)
+                displayContent = tokenChipsHtml + displayContent;
             }
             
             // Process Smart Tokens (file references become clickable chips)
             if (window.SmartTokens && window.SmartTokens.processMessageContent) {
                 displayContent = window.SmartTokens.processMessageContent(displayContent);
             }
-            
-            // Prepend token chips to display content
-            displayContent = tokenChipsHtml + displayContent;
             
             // Wrap in paragraph tags
             if (displayContent && !displayContent.startsWith('<p>') && !displayContent.startsWith('<span')) {
@@ -826,11 +915,22 @@ jQuery(document).ready(function($) {
             'summary': 'Summary'
         };
         var name = names[fileKey] || fileKey;
+        
+        // Handle custom file keys (e.g., custom_readme_txt -> readme.txt)
+        if (fileKey.startsWith('custom_')) {
+            var keyParts = fileKey.replace('custom_', '').split('_');
+            var ext = keyParts.pop();
+            var baseName = keyParts.join('_').replace(/_/g, '-');
+            name = baseName + '.' + ext;
+        }
+        
         var lang = 'text';
         if (fileKey.endsWith('_json')) lang = 'json';
         if (fileKey.endsWith('_php')) lang = 'php';
         if (fileKey.endsWith('_css')) lang = 'css';
         if (fileKey.endsWith('_js')) lang = 'javascript';
+        if (fileKey.endsWith('_txt')) lang = 'plaintext';
+        if (fileKey.endsWith('_html')) lang = 'html';
 
         var $widget = $('<div class="acf-bb-code-widget"></div>');
         $widget.append('<div class="acf-bb-code-header"><span class="dashicons dashicons-editor-code"></span> ' + name + '</div>');
@@ -967,6 +1067,26 @@ jQuery(document).ready(function($) {
         if (editors['script-js']) code['script_js'] = editors['script-js'].getValue();
         if (editors['fields-php']) code['fields_php'] = editors['fields-php'].getValue();
         if (editors['assets-php']) code['assets_php'] = editors['assets-php'].getValue();
+        
+        // Include custom files
+        try {
+            var customFilesJson = $('#acf-bb-custom-files').val();
+            if (customFilesJson) {
+                var customFilesData = JSON.parse(customFilesJson);
+                Object.keys(customFilesData).forEach(function(fileId) {
+                    var tabId = 'custom-' + fileId.replace(/_/g, '-');
+                    var dataKey = 'custom_' + fileId.replace(/-/g, '_');
+                    if (editors[tabId]) {
+                        code[dataKey] = editors[tabId].getValue();
+                    }
+                });
+                // Also include custom files metadata for AI context
+                code['_custom_files_meta'] = JSON.stringify(customFilesData);
+            }
+        } catch (e) {
+            console.error('Error including custom files in code context:', e);
+        }
+        
         return JSON.stringify(code);
     }
 
@@ -1212,6 +1332,297 @@ jQuery(document).ready(function($) {
         editors['script-js'].onDidChangeModelContent(function() { $('#textarea-script-js').val(editors['script-js'].getValue()); });
         editors['fields-php'].onDidChangeModelContent(function() { $('#textarea-fields-php').val(editors['fields-php'].getValue()); });
         editors['assets-php'].onDidChangeModelContent(function() { $('#textarea-assets-php').val(editors['assets-php'].getValue()); });
+        
+        // =====================================================
+        // Custom Files Management
+        // =====================================================
+        
+        var customFiles = {};
+        try {
+            var customFilesJson = $('#acf-bb-custom-files').val();
+            if (customFilesJson) {
+                customFiles = JSON.parse(customFilesJson);
+            }
+        } catch (e) {
+            console.error('Error parsing custom files:', e);
+        }
+        
+        // Language mapping for file extensions
+        var extToLanguage = {
+            'php': 'php',
+            'js': 'javascript',
+            'css': 'css',
+            'json': 'json',
+            'html': 'html',
+            'txt': 'plaintext'
+        };
+        
+        // Icon mapping for file extensions
+        var extToIcon = {
+            'php': 'dashicons-editor-code',
+            'js': 'dashicons-media-default',
+            'css': 'dashicons-art',
+            'json': 'dashicons-media-code',
+            'html': 'dashicons-media-text',
+            'txt': 'dashicons-text-page'
+        };
+        
+        // Initialize existing custom file editors
+        function initCustomFileEditors() {
+            $('.acf-bb-custom-tab').each(function() {
+                var $tab = $(this);
+                var tabId = $tab.data('tab');
+                var fileId = $tab.data('file-id');
+                var editorContainerId = 'editor-' + tabId;
+                var textareaId = 'textarea-' + tabId;
+                
+                if (editors[tabId]) return; // Already initialized
+                
+                var $container = $('#' + editorContainerId);
+                var $textarea = $('#' + textareaId);
+                
+                if ($container.length && $textarea.length) {
+                    var ext = getFileExtension(customFiles[fileId]?.filename || '');
+                    var lang = extToLanguage[ext] || 'plaintext';
+                    
+                    editors[tabId] = monaco.editor.create($container[0], {
+                        value: $textarea.val(),
+                        language: lang,
+                        theme: 'vs-dark',
+                        automaticLayout: true
+                    });
+                    
+                    // Sync with textarea
+                    editors[tabId].onDidChangeModelContent(function() {
+                        $textarea.val(editors[tabId].getValue());
+                        updateCustomFilesData();
+                    });
+                    
+                    // Update keyMap and languageMap
+                    var dataKey = 'custom_' + fileId.replace(/-/g, '_');
+                    keyMap[tabId] = dataKey;
+                    languageMap[tabId] = lang;
+                    
+                    // Register with SmartTokens for clickable chips in chat
+                    var filename = customFiles[fileId]?.filename || '';
+                    if (filename && window.SmartTokens && window.SmartTokens.registerCustomFile) {
+                        window.SmartTokens.registerCustomFile(filename, tabId);
+                    }
+                    
+                    // Setup PHP linting if needed
+                    if (lang === 'php') {
+                        var debouncedLint = debounce(function() { lintPHP(editors[tabId], tabId); }, 500);
+                        editors[tabId].onDidChangeModelContent(debouncedLint);
+                    }
+                }
+            });
+        }
+        
+        // Helper to get file extension
+        function getFileExtension(filename) {
+            return filename.split('.').pop().toLowerCase();
+        }
+        
+        // Update the hidden custom files JSON field
+        function updateCustomFilesData() {
+            // Sync content from all custom editors
+            Object.keys(customFiles).forEach(function(fileId) {
+                var tabId = 'custom-' + fileId.replace(/_/g, '-');
+                if (editors[tabId]) {
+                    customFiles[fileId].content = editors[tabId].getValue();
+                }
+            });
+            $('#acf-bb-custom-files').val(JSON.stringify(customFiles));
+        }
+        
+        // Add new file handler
+        $('#acf-bb-add-file').on('click', function() {
+            var filename = prompt('Enter filename (e.g., functions.php, helpers.js):');
+            if (!filename) return;
+            
+            // Validate filename
+            filename = filename.trim();
+            if (!filename.match(/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/)) {
+                alert('Invalid filename. Use letters, numbers, dashes, underscores, and a valid extension.');
+                return;
+            }
+            
+            // Check for duplicates
+            var fileId = filename.replace(/\./g, '_');
+            if (customFiles[fileId]) {
+                alert('A file with this name already exists.');
+                return;
+            }
+            
+            // Check for reserved filenames
+            var reservedNames = ['block.json', 'render.php', 'style.css', 'script.js', 'fields.php', 'assets.php'];
+            if (reservedNames.indexOf(filename.toLowerCase()) !== -1) {
+                alert('This filename is reserved. Please choose a different name.');
+                return;
+            }
+            
+            // Create file via AJAX
+            $.ajax({
+                url: acfBlockBuilder.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'acf_block_builder_add_custom_file',
+                    nonce: acfBlockBuilder.export_nonce,
+                    post_id: acfBlockBuilder.post_id,
+                    filename: filename,
+                    content: ''
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Create new file in UI
+                        var ext = getFileExtension(filename);
+                        var lang = extToLanguage[ext] || 'plaintext';
+                        var icon = extToIcon[ext] || 'dashicons-media-text';
+                        var tabId = 'custom-' + fileId.replace(/_/g, '-');
+                        var dataKey = 'custom_' + fileId.replace(/-/g, '_');
+                        
+                        // Add to customFiles object
+                        customFiles[fileId] = {
+                            filename: filename,
+                            content: ''
+                        };
+                        
+                        // Create tab
+                        var $tab = $('<a href="#" class="acf-bb-tab acf-bb-custom-tab" data-tab="' + tabId + '" data-file-type="' + ext + '" data-custom-file="true" data-file-id="' + fileId + '">' +
+                            '<span class="dashicons ' + icon + '"></span> ' + filename +
+                            '<button type="button" class="acf-bb-delete-file" data-file-id="' + fileId + '" title="Delete file">' +
+                            '<span class="dashicons dashicons-no-alt"></span>' +
+                            '</button>' +
+                            '<span class="acf-bb-lint-badge" data-lint-tab="' + tabId + '"></span>' +
+                            '</a>');
+                        
+                        // Insert before the add button
+                        $('#acf-bb-add-file').before($tab);
+                        
+                        // Create tab content
+                        var $content = $('<div class="acf-bb-tab-content" id="tab-' + tabId + '">' +
+                            '<div id="editor-' + tabId + '" class="monaco-editor-container"></div>' +
+                            '<textarea name="acf_block_builder_custom_file_' + fileId + '" id="textarea-' + tabId + '" class="hidden-textarea"></textarea>' +
+                            '</div>');
+                        
+                        $('.acf-bb-editor-wrapper').append($content);
+                        
+                        // Update keyMap and languageMap first
+                        keyMap[tabId] = dataKey;
+                        languageMap[tabId] = lang;
+                        
+                        // Register with SmartTokens for clickable chips in chat
+                        if (window.SmartTokens && window.SmartTokens.registerCustomFile) {
+                            window.SmartTokens.registerCustomFile(filename, tabId);
+                        }
+                        
+                        // Update custom files data
+                        updateCustomFilesData();
+                        
+                        // Switch to the new tab FIRST to make container visible
+                        $('.acf-bb-tab').removeClass('active');
+                        $tab.addClass('active');
+                        $('.acf-bb-tab-content').removeClass('active');
+                        $content.addClass('active');
+                        
+                        // Initialize Monaco editor AFTER container is visible
+                        setTimeout(function() {
+                            editors[tabId] = monaco.editor.create(document.getElementById('editor-' + tabId), {
+                                value: '',
+                                language: lang,
+                                theme: 'vs-dark',
+                                automaticLayout: true
+                            });
+                            
+                            // Sync with textarea
+                            editors[tabId].onDidChangeModelContent(function() {
+                                $('#textarea-' + tabId).val(editors[tabId].getValue());
+                                updateCustomFilesData();
+                            });
+                            
+                            // Setup PHP linting if needed
+                            if (lang === 'php') {
+                                var debouncedLint = debounce(function() { lintPHP(editors[tabId], tabId); }, 500);
+                                editors[tabId].onDidChangeModelContent(debouncedLint);
+                            }
+                            
+                            // Force layout refresh
+                            editors[tabId].layout();
+                            editors[tabId].focus();
+                        }, 50);
+                    } else {
+                        alert(response.data || 'Failed to create file.');
+                    }
+                },
+                error: function() {
+                    alert('Failed to create file. Please try again.');
+                }
+            });
+        });
+        
+        // Delete file handler
+        $(document).on('click', '.acf-bb-delete-file', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            var $btn = $(this);
+            var fileId = $btn.data('file-id');
+            var filename = customFiles[fileId]?.filename || fileId;
+            
+            if (!confirm('Are you sure you want to delete "' + filename + '"? This cannot be undone.')) {
+                return;
+            }
+            
+            var tabId = 'custom-' + fileId.replace(/_/g, '-');
+            var $tab = $('.acf-bb-tab[data-tab="' + tabId + '"]');
+            var isActive = $tab.hasClass('active');
+            
+            // Delete via AJAX
+            $.ajax({
+                url: acfBlockBuilder.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'acf_block_builder_delete_custom_file',
+                    nonce: acfBlockBuilder.export_nonce,
+                    post_id: acfBlockBuilder.post_id,
+                    file_id: fileId
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Dispose editor
+                        if (editors[tabId]) {
+                            editors[tabId].dispose();
+                            delete editors[tabId];
+                        }
+                        
+                        // Remove from keyMap and languageMap
+                        delete keyMap[tabId];
+                        delete languageMap[tabId];
+                        
+                        // Remove tab and content
+                        $tab.remove();
+                        $('#tab-' + tabId).remove();
+                        
+                        // Remove from customFiles
+                        delete customFiles[fileId];
+                        updateCustomFilesData();
+                        
+                        // If this was the active tab, switch to block-json
+                        if (isActive) {
+                            $('.acf-bb-tab[data-tab="block-json"]').click();
+                        }
+                    } else {
+                        alert(response.data || 'Failed to delete file.');
+                    }
+                },
+                error: function() {
+                    alert('Failed to delete file. Please try again.');
+                }
+            });
+        });
+        
+        // Initialize existing custom file editors
+        initCustomFileEditors();
         
         // Setup debounced PHP linting for PHP editors
         var debouncedLintRenderPHP = debounce(function() { lintPHP(editors['render-php'], 'render-php'); }, 500);
@@ -1846,6 +2257,88 @@ jQuery(document).ready(function($) {
         // Reset acceptance status for all files
         fileAcceptanceStatus = {};
         changedFileTabs = [];
+        
+        // Remove any dynamically added custom diff tabs from previous sessions
+        $('.acf-bb-diff-tabs .acf-bb-tab[data-custom-diff]').remove();
+        
+        // Local copies of extension maps (since the originals are in Monaco callback scope)
+        var localExtToIcon = {
+            'php': 'dashicons-editor-code',
+            'js': 'dashicons-media-default',
+            'css': 'dashicons-art',
+            'json': 'dashicons-media-code',
+            'html': 'dashicons-media-text',
+            'txt': 'dashicons-text-page'
+        };
+        var localExtToLanguage = {
+            'php': 'php',
+            'js': 'javascript',
+            'css': 'css',
+            'json': 'json',
+            'html': 'html',
+            'txt': 'plaintext'
+        };
+        
+        // Helper function to create a custom diff tab
+        function createCustomDiffTab(tabId, filename, isNew) {
+            var ext = filename.split('.').pop().toLowerCase();
+            var icon = localExtToIcon[ext] || 'dashicons-media-text';
+            var label = isNew ? filename + ' (new)' : filename;
+            
+            var $newTab = $('<a href="#" class="acf-bb-tab" data-diff-tab="' + tabId + '" data-custom-diff="true">' +
+                '<span class="dashicons ' + icon + '"></span> ' + label +
+                '<span class="acf-bb-tab-status"></span></a>');
+            $('.acf-bb-diff-tabs').append($newTab);
+            
+            // Bind click handler
+            $newTab.on('click', function(e) {
+                e.preventDefault();
+                $('.acf-bb-diff-tabs .acf-bb-tab').removeClass('active');
+                $(this).addClass('active');
+                currentDiffTab = tabId;
+                if (window.updateDiffEditor) {
+                    window.updateDiffEditor(tabId);
+                }
+                if (window.updateFileNavigation) {
+                    window.updateFileNavigation();
+                }
+            });
+            
+            return $newTab;
+        }
+        
+        // Add diff tabs for existing custom files that are already in keyMap
+        Object.keys(keyMap).forEach(function(tabId) {
+            if (tabId.startsWith('custom-')) {
+                // Get filename from the main editor tab
+                var $mainTab = $('.acf-bb-tabs .acf-bb-tab[data-tab="' + tabId + '"]');
+                var filename = $mainTab.find('.tab-filename').text() || tabId.replace('custom-', '').replace(/-/g, '.');
+                createCustomDiffTab(tabId, filename, false);
+            }
+        });
+        
+        // Add keyMap entries for new custom files from AI
+        Object.keys(data).forEach(function(dataKey) {
+            if (dataKey.startsWith('custom_') && dataKey !== '_custom_files_meta') {
+                // Check if this key already exists in keyMap
+                var existingTabId = Object.keys(keyMap).find(function(tid) { return keyMap[tid] === dataKey; });
+                if (!existingTabId) {
+                    // Create a temporary keyMap entry for the diff view
+                    var keyParts = dataKey.replace('custom_', '').split('_');
+                    var ext = keyParts.pop();
+                    var baseName = keyParts.join('_').replace(/_/g, '-');
+                    var filename = baseName + '.' + ext;
+                    var tabId = 'custom-' + baseName.replace(/-/g, '-') + '-' + ext;
+                    
+                    // Add to keyMap temporarily
+                    keyMap[tabId] = dataKey;
+                    languageMap[tabId] = localExtToLanguage[ext] || 'plaintext';
+                    
+                    // Create a diff tab for this new file
+                    createCustomDiffTab(tabId, filename, true);
+                }
+            }
+        });
 
         // 1. Identify changes
         var firstChangedTab = null;
@@ -1949,12 +2442,119 @@ jQuery(document).ready(function($) {
         }
     });
 
+    // Helper function to create custom file from AI response
+    function createCustomFileFromAI(dataKey, content) {
+        // Local copies of extension maps (since the originals are in Monaco callback scope)
+        var localExtToLanguage = {
+            'php': 'php',
+            'js': 'javascript',
+            'css': 'css',
+            'json': 'json',
+            'html': 'html',
+            'txt': 'plaintext'
+        };
+        var localExtToIcon = {
+            'php': 'dashicons-editor-code',
+            'js': 'dashicons-media-default',
+            'css': 'dashicons-art',
+            'json': 'dashicons-media-code',
+            'html': 'dashicons-media-text',
+            'txt': 'dashicons-text-page'
+        };
+        
+        // Extract filename from key (e.g., custom_helpers_php -> helpers.php)
+        var keyParts = dataKey.replace('custom_', '').split('_');
+        var ext = keyParts.pop();
+        var baseName = keyParts.join('_').replace(/_/g, '-');
+        var filename = baseName + '.' + ext;
+        var fileId = filename.replace(/\./g, '_');
+        var tabId = 'custom-' + fileId.replace(/_/g, '-');
+        
+        // Check if file already exists
+        if (editors[tabId]) {
+            return tabId;
+        }
+        
+        // Get language and icon for file type
+        var lang = localExtToLanguage[ext] || 'plaintext';
+        var icon = localExtToIcon[ext] || 'dashicons-media-text';
+        
+        // Update customFiles object
+        if (typeof customFiles === 'undefined') {
+            customFiles = {};
+        }
+        customFiles[fileId] = {
+            filename: filename,
+            content: content
+        };
+        
+        // Create tab
+        var $tab = $('<a href="#" class="acf-bb-tab acf-bb-custom-tab" data-tab="' + tabId + '" data-file-type="' + ext + '" data-custom-file="true" data-file-id="' + fileId + '">' +
+            '<span class="dashicons ' + icon + '"></span> ' + filename +
+            '<button type="button" class="acf-bb-delete-file" data-file-id="' + fileId + '" title="Delete file">' +
+            '<span class="dashicons dashicons-no-alt"></span>' +
+            '</button>' +
+            '<span class="acf-bb-lint-badge" data-lint-tab="' + tabId + '"></span>' +
+            '</a>');
+        
+        // Insert before the add button
+        $('#acf-bb-add-file').before($tab);
+        
+        // Create tab content
+        var $content = $('<div class="acf-bb-tab-content" id="tab-' + tabId + '">' +
+            '<div id="editor-' + tabId + '" class="monaco-editor-container"></div>' +
+            '<textarea name="acf_block_builder_custom_file_' + fileId + '" id="textarea-' + tabId + '" class="hidden-textarea"></textarea>' +
+            '</div>');
+        
+        $('.acf-bb-editor-wrapper').append($content);
+        
+        // Initialize Monaco editor
+        editors[tabId] = monaco.editor.create(document.getElementById('editor-' + tabId), {
+            value: '',
+            language: lang,
+            theme: 'vs-dark',
+            automaticLayout: true
+        });
+        
+        // Sync with textarea
+        editors[tabId].onDidChangeModelContent(function() {
+            $('#textarea-' + tabId).val(editors[tabId].getValue());
+            if (typeof updateCustomFilesData === 'function') {
+                updateCustomFilesData();
+            }
+        });
+        
+        // Update keyMap and languageMap
+        keyMap[tabId] = dataKey;
+        languageMap[tabId] = lang;
+        
+        // Register with SmartTokens for clickable chips in chat
+        if (window.SmartTokens && window.SmartTokens.registerCustomFile) {
+            window.SmartTokens.registerCustomFile(filename, tabId);
+        }
+        
+        // Update custom files data
+        $('#acf-bb-custom-files').val(JSON.stringify(customFiles));
+        
+        return tabId;
+    }
+    
     // Apply All Changes - bypasses review status and applies all pending AI changes
     $('#acf-bb-diff-apply-all').on('click', function(e) {
         e.preventDefault();
         if (!pendingAIChanges) return;
 
         var appliedFiles = [];
+        
+        // First, create any custom files that don't exist yet
+        Object.keys(pendingAIChanges).forEach(function(dataKey) {
+            if (dataKey.startsWith('custom_') && dataKey !== '_custom_files_meta') {
+                var tabId = Object.keys(keyMap).find(function(tid) { return keyMap[tid] === dataKey; });
+                if (!tabId || !editors[tabId]) {
+                    createCustomFileFromAI(dataKey, pendingAIChanges[dataKey]);
+                }
+            }
+        });
 
         $.each(keyMap, function(tabId, dataKey) {
             if (pendingAIChanges[dataKey] !== undefined) {
@@ -1996,6 +2596,20 @@ jQuery(document).ready(function($) {
 
         var appliedFiles = [];
         var rejectedFiles = [];
+        
+        // First, create any custom files that are accepted and don't exist yet
+        Object.keys(pendingAIChanges).forEach(function(dataKey) {
+            if (dataKey.startsWith('custom_') && dataKey !== '_custom_files_meta') {
+                var existingTabId = Object.keys(keyMap).find(function(tid) { return keyMap[tid] === dataKey; });
+                if (!existingTabId || !editors[existingTabId]) {
+                    // Check if this custom file is not rejected
+                    var tempTabId = 'custom-' + dataKey.replace('custom_', '').replace(/_/g, '-');
+                    if (fileAcceptanceStatus[tempTabId] !== 'rejected') {
+                        createCustomFileFromAI(dataKey, pendingAIChanges[dataKey]);
+                    }
+                }
+            }
+        });
 
         // Apply changes based on acceptance status
         $.each(keyMap, function(tabId, dataKey) {
@@ -2200,46 +2814,33 @@ jQuery(document).ready(function($) {
             if ($img.length) imageUrl = $img.attr('src');
         }
         
-        // Build display message with attached chips (files and errors)
-        var displayMessage = prompt || 'Generating block from image...';
+        // Build display message with attached chips at their original positions
+        var displayMessage = '';
         var attachedTokens = window.MentionAutocomplete ? window.MentionAutocomplete.getAttachedTokens() : [];
-        if (attachedTokens.length > 0) {
-            var chips = attachedTokens.map(function(token) {
-                if (token.type === 'error') {
-                    // Build tooltip lines for error chip (for custom popover)
-                    var tooltipLines = [];
-                    if (token.details) {
-                        token.details.forEach(function(detail) {
-                            tooltipLines.push('<strong>' + detail.file + '</strong>');
-                            detail.errors.forEach(function(err) {
-                                tooltipLines.push('• Line ' + err.line + ': ' + err.message);
-                            });
-                        });
-                    }
-                    
-                    return '<span class="acf-bb-token-chip acf-bb-error-token-chip" data-token-type="error" data-tooltip="' + 
-                           tooltipLines.join('\n').replace(/"/g, '&quot;') + '">' +
-                           '<span class="dashicons dashicons-warning"></span>' +
-                           '<span class="acf-bb-token-label">' + token.count + ' Error' + (token.count !== 1 ? 's' : '') + '</span></span>';
-                } else {
-                    // File chip
-                    return '<span class="acf-bb-token-chip" data-token-type="file" data-tab-id="' + token.tabId + '">' +
-                           '<span class="dashicons dashicons-' + token.icon + '"></span>' +
-                           '<span class="acf-bb-token-label">' + token.label + '</span></span>';
-                }
-            }).join(' ');
-            displayMessage = chips + ' ' + displayMessage;
+        
+        if (window.MentionAutocomplete && window.MentionAutocomplete.getDisplayContent) {
+            // Use getDisplayContent to preserve chip positions
+            displayMessage = window.MentionAutocomplete.getDisplayContent();
         }
         
-        // Get attached context and tokens BEFORE clearing (important!)
+        // Fallback if no display content (e.g., image-only submission)
+        if (!displayMessage) {
+            displayMessage = prompt || 'Generating block from image...';
+        }
+        
+        // Get attached context, tokens, and structured content BEFORE clearing (important!)
         var mentionContext = '';
         var savedAttachedTokens = null;
+        var savedStructuredContent = null;
         if (window.MentionAutocomplete) {
             mentionContext = window.MentionAutocomplete.getContextString();
             savedAttachedTokens = window.MentionAutocomplete.getAttachedTokens();
+            if (window.MentionAutocomplete.getStructuredContent) {
+                savedStructuredContent = window.MentionAutocomplete.getStructuredContent();
+            }
         }
         
-        appendMessage('user', displayMessage, imageUrl, false, null, savedAttachedTokens);
+        appendMessage('user', displayMessage, imageUrl, false, null, savedAttachedTokens, savedStructuredContent);
         
         // Clear input - clear contenteditable editor and textarea
         if (window.MentionAutocomplete) {
@@ -2765,6 +3366,13 @@ jQuery(document).ready(function($) {
             
             // Build text description
             var changedFiles = Object.keys(historyEntry.code).map(function(k) {
+                if (k.startsWith('custom_')) {
+                    // Parse custom file key properly (e.g., custom_readme_txt -> readme.txt)
+                    var keyParts = k.replace('custom_', '').split('_');
+                    var ext = keyParts.pop();
+                    var baseName = keyParts.join('_').replace(/_/g, '-');
+                    return baseName + '.' + ext;
+                }
                 return k.replace('_', '.');
             });
             if (changedFiles.length > 0) {
@@ -3073,10 +3681,96 @@ jQuery(document).ready(function($) {
         },
         
         updateVersionCounts: function(counts) {
+            var self = this;
+            var $tabContainer = $('.acf-bb-version-file-tabs');
+            
+            // First update existing tabs
             $.each(counts, function(fileType, data) {
                 var $badge = $('[data-count-for="' + fileType + '"]');
-                $badge.text(data.count > 0 ? data.count : '-');
+                if ($badge.length) {
+                    $badge.text(data.count > 0 ? data.count : '-');
+                }
             });
+            
+            // Remove old custom file tabs
+            $tabContainer.find('.acf-bb-version-file-tab.is-custom').remove();
+            
+            // Add tabs for custom files
+            $.each(counts, function(fileType, data) {
+                // Check if it's a custom file (starts with 'custom_')
+                if (fileType.indexOf('custom_') === 0) {
+                    // Check if tab already exists
+                    if ($tabContainer.find('[data-file-type="' + fileType + '"]').length === 0) {
+                        var label = data.label || fileType;
+                        var ext = self.getExtensionFromFilename(label);
+                        var icon = self.getIconForExtension(ext);
+                        
+                        var $tab = $('<button type="button" class="acf-bb-version-file-tab is-custom" data-file-type="' + fileType + '">' +
+                            '<span class="file-name">' + label + '</span>' +
+                            '<span class="version-count" data-count-for="' + fileType + '">' + (data.count > 0 ? data.count : '-') + '</span>' +
+                            '</button>');
+                        
+                        $tabContainer.append($tab);
+                        
+                        // Bind click handler
+                        $tab.on('click', function(e) {
+                            e.preventDefault();
+                            self.switchFileType(fileType);
+                        });
+                    }
+                }
+            });
+        },
+        
+        getExtensionFromFilename: function(filename) {
+            var parts = filename.split('.');
+            return parts.length > 1 ? parts.pop().toLowerCase() : '';
+        },
+        
+        getIconForExtension: function(ext) {
+            var iconMap = {
+                'php': 'dashicons-editor-code',
+                'js': 'dashicons-media-default',
+                'css': 'dashicons-art',
+                'json': 'dashicons-media-code',
+                'html': 'dashicons-media-text',
+                'txt': 'dashicons-text-page'
+            };
+            return iconMap[ext] || 'dashicons-media-text';
+        },
+        
+        getLanguageForFileType: function(fileType) {
+            // Check core file types first
+            if (this.languageMap[fileType]) {
+                return this.languageMap[fileType];
+            }
+            
+            // For custom files, extract from the file label
+            if (fileType.indexOf('custom_') === 0 && this.allVersions[fileType]) {
+                var label = this.allVersions[fileType].label || '';
+                var ext = this.getExtensionFromFilename(label);
+                return this.getLanguageForExtension(ext);
+            }
+            
+            return 'text';
+        },
+        
+        getLanguageForExtension: function(ext) {
+            var langMap = {
+                'php': 'php',
+                'js': 'javascript',
+                'css': 'css',
+                'json': 'json',
+                'html': 'html',
+                'txt': 'plaintext',
+                'md': 'markdown',
+                'xml': 'xml',
+                'svg': 'xml',
+                'sql': 'sql',
+                'sh': 'shell',
+                'bash': 'shell'
+            };
+            return langMap[ext] || 'plaintext';
         },
         
         switchFileType: function(fileType) {
@@ -3273,7 +3967,7 @@ jQuery(document).ready(function($) {
                 return;
             }
             
-            var language = this.languageMap[this.currentFileType] || 'text';
+            var language = this.getLanguageForFileType(this.currentFileType);
             
             // Create diff editor
             this.versionDiffEditor = monaco.editor.createDiffEditor(container, {
